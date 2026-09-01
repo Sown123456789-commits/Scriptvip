@@ -1,11 +1,11 @@
 -- =================================================================
--- HỆ THỐNG GET KEY SOLIX HUB - TLONG SYSTEM (AUTO-SAVE KEY)
+-- HỆ THỐNG GET KEY SOLIX HUB - Kai SYSTEM (AUTO-SAVE KEY)
 -- =================================================================
 
-local DOMAIN_VERCEL = "https://v2.tomtangacc.com/"
-local DISCORD_INVITE = "https://discord.gg/TvwRC4tba"
+local DOMAIN_VERCEL = "https://v2.tomtangacc.com/getkey.php"
+local DISCORD_INVITE = "https://discord.gg/9gWma4JTpD"
 local DISCORD_ICON_URL = "rbxassetid://99761773347476"
-local SAVE_FILE_NAME = "TLongSystem_KeySave.txt" -- File lưu trạng thái key
+local SAVE_FILE_NAME = "KaiSystem_KeySave.txt" -- File lưu trạng thái key
 
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -396,7 +396,7 @@ CheckKeyBtn.MouseButton1Click:Connect(function()
     task.wait(0.35)
     local enteredKey = string.gsub(InputBox.Text, "%s+", "")
     
-    if enteredKey:find("TLong%-" .. todayDateStr) then
+    if enteredKey:find("Kai%-" .. todayDateStr) then
         StatusBanner.BackgroundColor3 = Color3.fromRGB(15, 60, 30)
         StatusMsg.TextColor3 = Color3.fromRGB(80, 255, 140)
         StatusMsg.Text = "✔ Key hợp lệ! Đang khởi chạy Solix Hub..."
