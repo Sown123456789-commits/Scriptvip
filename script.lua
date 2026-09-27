@@ -1,9 +1,9 @@
 -- ==============================================================================
--- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.3 (EN/VI)
+-- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.4 (EN/VI)
 -- Tối ưu hóa:
 -- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault.
 -- 2. Tách Module Tối Ưu (Hoàng hôn + Chống lag) thành nút Bật/Tắt riêng (Mặc định: Tắt).
--- 3. Sửa lỗi: Chống lag không còn chạy ngầm khi nút Tối Ưu bị Tắt.
+-- 3. SỬA LỖI TRIỆT ĐỂ: Chống lag không còn chạy ngầm khi nút Tối Ưu bị Tắt.
 -- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
 -- ==============================================================================
 local CoreGui = game:GetService("CoreGui")
@@ -22,10 +22,12 @@ task.spawn(function()
 end)
 
 -- ==================== 2. MODULE TỐI ƯU ĐỒ HỌA & CHỐNG LAG (TÁCH RIÊNG) ====================
+-- Nguyên tắc: Khi Tắt, KHÔNG có bất kỳ vòng lặp hay sự kiện nào chạy ngầm.
 local GraphicsOptimizer = {}
 GraphicsOptimizer.Active = false
 GraphicsOptimizer.Connections = {}
 GraphicsOptimizer.OriginalLighting = {}
+GraphicsOptimizer.OriginalMaterials = {} -- Lưu Material gốc của các part
 
 -- Lưu trạng thái Lighting gốc
 local function saveLighting()
@@ -87,24 +89,57 @@ local function applySunsetShader()
     end)
 end
 
+-- Hàm xử lý một BasePart (dùng chung cho cả quét ban đầu và DescendantAdded)
+local function processPart(obj)
+    if not GraphicsOptimizer.Active then return end
+    if not obj or not obj.Parent then return end
+    
+    if obj:IsA("BasePart") then
+        -- Lưu Material gốc trước khi đổi (chỉ lưu 1 lần)
+        if not GraphicsOptimizer.OriginalMaterials[obj] then
+            GraphicsOptimizer.OriginalMaterials[obj] = {
+                Material = obj.Material,
+                CastShadow = obj.CastShadow
+            }
+        end
+        
+        obj.CastShadow = false
+        local name = obj.Name:lower()
+        local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
+        if name:find("egg") or pName:find("egg") then
+            obj.Material = Enum.Material.Neon
+        else
+            obj.Material = Enum.Material.SmoothPlastic
+        end
+    elseif obj:IsA("Decal") or obj:IsA("Texture") then
+        if not GraphicsOptimizer.OriginalMaterials[obj] then
+            GraphicsOptimizer.OriginalMaterials[obj] = { Transparency = obj.Transparency }
+        end
+        obj.Transparency = 1
+    end
+end
+
+-- Khôi phục Material gốc cho tất cả các part đã lưu
+local function restoreMaterials()
+    for obj, data in pairs(GraphicsOptimizer.OriginalMaterials) do
+        if obj and obj.Parent then
+            pcall(function()
+                if data.Material then obj.Material = data.Material end
+                if data.CastShadow ~= nil then obj.CastShadow = data.CastShadow end
+                if data.Transparency ~= nil then obj.Transparency = data.Transparency end
+            end)
+        end
+    end
+    GraphicsOptimizer.OriginalMaterials = {}
+end
+
 -- Quét map chuyển SmoothPlastic & Neon (Chỉ chạy khi Active == true)
 local function processGraphics(parent)
     if not GraphicsOptimizer.Active then return end
     local children = parent:GetChildren()
     for i, obj in ipairs(children) do
         if not GraphicsOptimizer.Active then break end
-        if obj:IsA("BasePart") then
-            obj.CastShadow = false
-            local name = obj.Name:lower()
-            local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
-            if name:find("egg") or pName:find("egg") then
-                obj.Material = Enum.Material.Neon
-            else
-                obj.Material = Enum.Material.SmoothPlastic
-            end
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            obj.Transparency = 1
-        end
+        processPart(obj)
         if i % 50 == 0 then
             RunService.RenderStepped:Wait()
         end
@@ -131,18 +166,7 @@ function GraphicsOptimizer:Start()
         if not self.Active then return end
         task.defer(function()
             if not self.Active then return end
-            if obj:IsA("BasePart") then
-                obj.CastShadow = false
-                local name = obj.Name:lower()
-                local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
-                if name:find("egg") or pName:find("egg") then
-                    obj.Material = Enum.Material.Neon
-                else
-                    obj.Material = Enum.Material.SmoothPlastic
-                end
-            elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                obj.Transparency = 1
-            end
+            processPart(obj)
         end)
     end)
     table.insert(self.Connections, conn)
@@ -159,8 +183,9 @@ function GraphicsOptimizer:Stop()
     end
     self.Connections = {}
     
-    -- Khôi phục đồ họa gốc (Ánh sáng)
+    -- Khôi phục đồ họa gốc
     restoreLighting()
+    restoreMaterials()
 end
 
 -- ==================== 3. HỆ THỐNG DỊCH THUẬT SONG NGỮ (EN/VI) ====================
