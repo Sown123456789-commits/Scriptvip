@@ -1,8 +1,8 @@
 -- ==============================================================================
--- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.1 (EN/VI)
+-- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.2 (EN/VI)
 -- Tối ưu hóa:
 -- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault.
--- 2. Nostalgic Shader: Ánh sáng chiều tà (Golden hour), tone ấm, tương phản nhẹ.
+-- 2. Tách Module Hoàng Hôn Hoài Niệm & Chống Lag thành nút Bật/Tắt riêng (Mặc định: Tắt).
 -- 3. Recursive Chunking: Quét map đệ quy ngầm, loại bỏ 100% hiện tượng đơ khởi động.
 -- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
 -- ==============================================================================
@@ -21,20 +21,52 @@ task.spawn(function()
     end)
 end)
 
--- ==================== 2. MODULE HOÀNG HÔN HOÀI NIỆM & CHỐNG LAG ====================
--- Nhường 3.5s cho UI gốc load, chống đơ main thread
-task.delay(3.5, function()
+-- ==================== 2. MODULE HOÀNG HÔN HOÀI NIỆM & CHỐNG LAG (TÁCH RIÊNG) ====================
+local GraphicsOptimizer = {}
+GraphicsOptimizer.Active = false
+GraphicsOptimizer.Connections = {}
+GraphicsOptimizer.OriginalLighting = {}
+
+-- Lưu trạng thái Lighting gốc
+local function saveLighting()
+    GraphicsOptimizer.OriginalLighting = {
+        GlobalShadows = Lighting.GlobalShadows,
+        TimeOfDay = Lighting.TimeOfDay,
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        Brightness = Lighting.Brightness,
+        ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        ColorShift_Top = Lighting.ColorShift_Top,
+        FogEnd = Lighting.FogEnd,
+    }
+end
+
+-- Khôi phục Lighting gốc
+local function restoreLighting()
+    if next(GraphicsOptimizer.OriginalLighting) then
+        for k, v in pairs(GraphicsOptimizer.OriginalLighting) do
+            pcall(function() Lighting[k] = v end)
+        end
+    end
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v.Name == "Chilli_CC" or v.Name == "Chilli_Bloom" then
+            v:Destroy()
+        end
+    end
+end
+
+-- Áp dụng Shader Hoàng Hôn
+local function applySunsetShader()
     pcall(function()
-        -- Shader Hoàng Hôn Chân Thực (Golden Hour)
         Lighting.GlobalShadows = false
-        Lighting.TimeOfDay = "17:15:00" -- Chiều tà vàng ruộm
-        Lighting.Ambient = Color3.fromRGB(110, 100, 90) -- Bóng râm xám ấm
-        Lighting.OutdoorAmbient = Color3.fromRGB(160, 130, 100) -- Nắng vàng nhẹ nhàng
+        Lighting.TimeOfDay = "17:15:00"
+        Lighting.Ambient = Color3.fromRGB(110, 100, 90)
+        Lighting.OutdoorAmbient = Color3.fromRGB(160, 130, 100)
         Lighting.Brightness = 1.0
         Lighting.ColorShift_Bottom = Color3.fromRGB(130, 110, 90)
         Lighting.ColorShift_Top = Color3.fromRGB(255, 235, 210)
-        Lighting.FogEnd = 9e9 -- Xóa sương mù
-        
+        Lighting.FogEnd = 9e9
+
         for _, v in ipairs(Lighting:GetChildren()) do
             if v:IsA("PostEffect") or v:IsA("Atmosphere") then
                 v:Destroy()
@@ -42,62 +74,94 @@ task.delay(3.5, function()
         end
 
         local cc = Instance.new("ColorCorrectionEffect", Lighting)
+        cc.Name = "Chilli_CC"
         cc.Saturation = 0.15
         cc.Contrast = 0.05
         cc.TintColor = Color3.fromRGB(255, 250, 240)
 
         local bloom = Instance.new("BloomEffect", Lighting)
+        bloom.Name = "Chilli_Bloom"
         bloom.Intensity = 0.35
         bloom.Size = 14
         bloom.Threshold = 1.2
+    end)
+end
 
-        -- Quét map chuyển SmoothPlastic & Neon (Phân luồng siêu nhẹ)
-        local function processGraphics(parent)
-            local children = parent:GetChildren()
-            for i, obj in ipairs(children) do
-                if obj:IsA("BasePart") then
-                    obj.CastShadow = false
-                    local name = obj.Name:lower()
-                    local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
-                    if name:find("egg") or pName:find("egg") then
-                        obj.Material = Enum.Material.Neon
-                    else
-                        obj.Material = Enum.Material.SmoothPlastic
-                    end
-                elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                    obj.Transparency = 1
-                end
-                if i % 50 == 0 then
-                    RunService.RenderStepped:Wait()
-                end
-                processGraphics(obj)
+-- Quét map chuyển SmoothPlastic & Neon
+local function processGraphics(parent)
+    if not GraphicsOptimizer.Active then return end
+    local children = parent:GetChildren()
+    for i, obj in ipairs(children) do
+        if not GraphicsOptimizer.Active then break end -- Dừng ngay nếu bị tắt
+        if obj:IsA("BasePart") then
+            obj.CastShadow = false
+            local name = obj.Name:lower()
+            local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
+            if name:find("egg") or pName:find("egg") then
+                obj.Material = Enum.Material.Neon
+            else
+                obj.Material = Enum.Material.SmoothPlastic
             end
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = 1
         end
+        if i % 50 == 0 then
+            RunService.RenderStepped:Wait()
+        end
+        processGraphics(obj)
+    end
+end
 
-        task.spawn(function()
-            pcall(function()
-                processGraphics(workspace)
-            end)
-        end)
+-- Khởi động Module
+function GraphicsOptimizer:Start()
+    if self.Active then return end
+    self.Active = true
+    
+    -- 1. Lưu và áp dụng shader
+    saveLighting()
+    applySunsetShader()
 
-        workspace.DescendantAdded:Connect(function(obj)
-            task.defer(function()
-                if obj:IsA("BasePart") then
-                    obj.CastShadow = false
-                    local name = obj.Name:lower()
-                    local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
-                    if name:find("egg") or pName:find("egg") then
-                        obj.Material = Enum.Material.Neon
-                    else
-                        obj.Material = Enum.Material.SmoothPlastic
-                    end
-                elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                    obj.Transparency = 1
+    -- 2. Quét map lần đầu
+    task.spawn(function()
+        pcall(function() processGraphics(workspace) end)
+    end)
+
+    -- 3. Lắng nghe các object mới thêm vào map
+    local conn = workspace.DescendantAdded:Connect(function(obj)
+        if not self.Active then return end
+        task.defer(function()
+            if not self.Active then return end
+            if obj:IsA("BasePart") then
+                obj.CastShadow = false
+                local name = obj.Name:lower()
+                local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
+                if name:find("egg") or pName:find("egg") then
+                    obj.Material = Enum.Material.Neon
+                else
+                    obj.Material = Enum.Material.SmoothPlastic
                 end
-            end)
+            elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                obj.Transparency = 1
+            end
         end)
     end)
-end)
+    table.insert(self.Connections, conn)
+end
+
+-- Tắt Module
+function GraphicsOptimizer:Stop()
+    if not self.Active then return end
+    self.Active = false
+    
+    -- Ngắt kết nối sự kiện
+    for _, conn in ipairs(self.Connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    self.Connections = {}
+    
+    -- Khôi phục đồ họa gốc
+    restoreLighting()
+end
 
 -- ==================== 3. HỆ THỐNG DỊCH THUẬT SONG NGỮ (EN/VI) ====================
 local currentLanguage = "VI"
@@ -677,94 +741,150 @@ local function updateAllActive()
     end
 end
 
--- ==================== 4. NÚT ĐỔI NGÔN NGỮ (TOP-CENTER) ====================
-local function createLangToggleUI()
+-- ==================== 4. NÚT ĐỔI NGÔN NGỮ & CÔNG TẮC TỐI ƯU (TOP-CENTER) ====================
+local function createTopUI()
     local parentTarget = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-    local old = parentTarget:FindFirstChild("Chilli_LangToggle_Slate")
+    local old = parentTarget:FindFirstChild("Chilli_TopUI_Slate")
     if old then old:Destroy() end
 
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "Chilli_LangToggle_Slate"
+    ScreenGui.Name = "Chilli_TopUI_Slate"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.IgnoreGuiInset = true
     ScreenGui.DisplayOrder = 2147483647
     ScreenGui.Parent = parentTarget
 
-    local Container = Instance.new("Frame", ScreenGui)
-    Container.Size = UDim2.new(0, 136, 0, 28)
-    Container.AnchorPoint = Vector2.new(0.5, 0)
-    Container.Position = UDim2.new(0.5, 0, 0, 15)
-    Container.BackgroundColor3 = Color3.fromRGB(16, 20, 28)
-    Container.BackgroundTransparency = 0.2
-    Container.BorderSizePixel = 0
-    Instance.new("UICorner", Container).CornerRadius = UDim.new(1, 0)
+    -- Container chính (chứa cả 2 nút)
+    local MainFrame = Instance.new("Frame", ScreenGui)
+    MainFrame.Size = UDim2.new(0, 280, 0, 28)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0, 15)
+    MainFrame.BackgroundTransparency = 1
 
-    local Stroke = Instance.new("UIStroke", Container)
-    Stroke.Color = Color3.fromRGB(160, 45, 45)
-    Stroke.Thickness = 1.0
+    -- === Nút đổi ngôn ngữ ===
+    local LangBtnFrame = Instance.new("Frame", MainFrame)
+    LangBtnFrame.Size = UDim2.new(0, 130, 1, 0)
+    LangBtnFrame.Position = UDim2.new(0, 0, 0, 0)
+    LangBtnFrame.BackgroundColor3 = Color3.fromRGB(16, 20, 28)
+    LangBtnFrame.BackgroundTransparency = 0.2
+    LangBtnFrame.BorderSizePixel = 0
+    Instance.new("UICorner", LangBtnFrame).CornerRadius = UDim.new(1, 0)
 
-    local Icon = Instance.new("TextLabel", Container)
-    Icon.Size = UDim2.new(0, 22, 1, 0)
-    Icon.Position = UDim2.new(0, 8, 0, 0)
-    Icon.BackgroundTransparency = 1
-    Icon.Text = "🌐"
-    Icon.TextSize = 14
+    local LangStroke = Instance.new("UIStroke", LangBtnFrame)
+    LangStroke.Color = Color3.fromRGB(160, 45, 45)
+    LangStroke.Thickness = 1.0
 
-    local Label = Instance.new("TextLabel", Container)
-    Label.Size = UDim2.new(1, -36, 1, 0)
-    Label.Position = UDim2.new(0, 30, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = "Tiếng Việt"
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextSize = 11
-    Label.TextColor3 = Color3.fromRGB(240, 130, 130)
-    Label.TextXAlignment = Enum.TextXAlignment.Left
+    local LangIcon = Instance.new("TextLabel", LangBtnFrame)
+    LangIcon.Size = UDim2.new(0, 22, 1, 0)
+    LangIcon.Position = UDim2.new(0, 8, 0, 0)
+    LangIcon.BackgroundTransparency = 1
+    LangIcon.Text = "🌐"
+    LangIcon.TextSize = 14
 
-    local ClickBtn = Instance.new("TextButton", Container)
-    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
-    ClickBtn.BackgroundTransparency = 1
-    ClickBtn.Text = ""
+    local LangLabel = Instance.new("TextLabel", LangBtnFrame)
+    LangLabel.Size = UDim2.new(1, -36, 1, 0)
+    LangLabel.Position = UDim2.new(0, 30, 0, 0)
+    LangLabel.BackgroundTransparency = 1
+    LangLabel.Text = "Tiếng Việt"
+    LangLabel.Font = Enum.Font.GothamMedium
+    LangLabel.TextSize = 11
+    LangLabel.TextColor3 = Color3.fromRGB(240, 130, 130)
+    LangLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+    local LangClickBtn = Instance.new("TextButton", LangBtnFrame)
+    LangClickBtn.Size = UDim2.new(1, 0, 1, 0)
+    LangClickBtn.BackgroundTransparency = 1
+    LangClickBtn.Text = ""
+
+    -- === Nút Bật/Tắt Tối Ưu Đồ Họa ===
+    local OptBtnFrame = Instance.new("Frame", MainFrame)
+    OptBtnFrame.Size = UDim2.new(0, 130, 1, 0)
+    OptBtnFrame.Position = UDim2.new(0, 145, 0, 0) -- Cách nút ngôn ngữ 15px
+    OptBtnFrame.BackgroundColor3 = Color3.fromRGB(16, 20, 28)
+    OptBtnFrame.BackgroundTransparency = 0.2
+    OptBtnFrame.BorderSizePixel = 0
+    Instance.new("UICorner", OptBtnFrame).CornerRadius = UDim.new(1, 0)
+
+    local OptStroke = Instance.new("UIStroke", OptBtnFrame)
+    OptStroke.Color = Color3.fromRGB(75, 45, 45) -- Màu xám tối (Tắt)
+    OptStroke.Thickness = 1.0
+
+    local OptIcon = Instance.new("TextLabel", OptBtnFrame)
+    OptIcon.Size = UDim2.new(0, 22, 1, 0)
+    OptIcon.Position = UDim2.new(0, 8, 0, 0)
+    OptIcon.BackgroundTransparency = 1
+    OptIcon.Text = "⚡"
+    OptIcon.TextSize = 14
+
+    local OptLabel = Instance.new("TextLabel", OptBtnFrame)
+    OptLabel.Size = UDim2.new(1, -36, 1, 0)
+    OptLabel.Position = UDim2.new(0, 30, 0, 0)
+    OptLabel.BackgroundTransparency = 1
+    OptLabel.Text = "Tối Ưu: Tắt"
+    OptLabel.Font = Enum.Font.GothamMedium
+    OptLabel.TextSize = 11
+    OptLabel.TextColor3 = Color3.fromRGB(150, 150, 150) -- Màu xám (Tắt)
+    OptLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local OptClickBtn = Instance.new("TextButton", OptBtnFrame)
+    OptClickBtn.Size = UDim2.new(1, 0, 1, 0)
+    OptClickBtn.BackgroundTransparency = 1
+    OptClickBtn.Text = ""
+
+    -- === Kéo thả MainFrame ===
     local dragging, dragStart, startPos = false, nil, nil
-    Container.InputBegan:Connect(function(input)
+    MainFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPos = Container.Position
+            startPos = MainFrame.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
-
-    Container.InputChanged:Connect(function(input)
+    MainFrame.InputChanged:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
             local delta = input.Position - dragStart
-            Container.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 
-    ClickBtn.MouseButton1Click:Connect(function()
+    -- === Logic nút đổi ngôn ngữ ===
+    LangClickBtn.MouseButton1Click:Connect(function()
         if currentLanguage == "VI" then
             currentLanguage = "EN"
-            Label.Text = "English"
-            TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(215, 180, 180)}):Play()
-            TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(75, 45, 45)}):Play()
+            LangLabel.Text = "English"
+            TweenService:Create(LangLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(215, 180, 180)}):Play()
+            TweenService:Create(LangStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(75, 45, 45)}):Play()
         else
             currentLanguage = "VI"
-            Label.Text = "Tiếng Việt"
-            TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(240, 130, 130)}):Play()
-            TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(160, 45, 45)}):Play()
+            LangLabel.Text = "Tiếng Việt"
+            TweenService:Create(LangLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(240, 130, 130)}):Play()
+            TweenService:Create(LangStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(160, 45, 45)}):Play()
         end
         updateAllActive()
+    end)
+
+    -- === Logic nút Bật/Tắt Tối Ưu ===
+    OptClickBtn.MouseButton1Click:Connect(function()
+        if GraphicsOptimizer.Active then
+            GraphicsOptimizer:Stop()
+            OptLabel.Text = "Tối Ưu: Tắt"
+            TweenService:Create(OptLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play()
+            TweenService:Create(OptStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(75, 45, 45)}):Play()
+        else
+            GraphicsOptimizer:Start()
+            OptLabel.Text = "Tối Ưu: Bật"
+            TweenService:Create(OptLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(130, 240, 130)}):Play()
+            TweenService:Create(OptStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(45, 160, 45)}):Play()
+        end
     end)
 end
 
 -- ==================== 5. BỘ QUÉT ZERO-LAG ĐƯỢC DEFER SAU CÙNG ====================
 task.delay(4.5, function()
-    createLangToggleUI()
+    createTopUI()
     
     local searchRoots = { gethui and gethui(), CoreGui, LocalPlayer:FindFirstChild("PlayerGui") }
 
