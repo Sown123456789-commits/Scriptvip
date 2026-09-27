@@ -1,9 +1,9 @@
 -- ==============================================================================
--- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.2 (EN/VI)
+-- CHILLI HUB - ULTRA ZERO-LAG & NOSTALGIC SUNSET ENGINE V10.3 (EN/VI)
 -- Tối ưu hóa:
 -- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault.
--- 2. Tách Module Hoàng Hôn Hoài Niệm & Chống Lag thành nút Bật/Tắt riêng (Mặc định: Tắt).
--- 3. Recursive Chunking: Quét map đệ quy ngầm, loại bỏ 100% hiện tượng đơ khởi động.
+-- 2. Tách Module Tối Ưu (Hoàng hôn + Chống lag) thành nút Bật/Tắt riêng (Mặc định: Tắt).
+-- 3. Sửa lỗi: Chống lag không còn chạy ngầm khi nút Tối Ưu bị Tắt.
 -- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
 -- ==============================================================================
 local CoreGui = game:GetService("CoreGui")
@@ -21,7 +21,7 @@ task.spawn(function()
     end)
 end)
 
--- ==================== 2. MODULE HOÀNG HÔN HOÀI NIỆM & CHỐNG LAG (TÁCH RIÊNG) ====================
+-- ==================== 2. MODULE TỐI ƯU ĐỒ HỌA & CHỐNG LAG (TÁCH RIÊNG) ====================
 local GraphicsOptimizer = {}
 GraphicsOptimizer.Active = false
 GraphicsOptimizer.Connections = {}
@@ -87,12 +87,12 @@ local function applySunsetShader()
     end)
 end
 
--- Quét map chuyển SmoothPlastic & Neon
+-- Quét map chuyển SmoothPlastic & Neon (Chỉ chạy khi Active == true)
 local function processGraphics(parent)
     if not GraphicsOptimizer.Active then return end
     local children = parent:GetChildren()
     for i, obj in ipairs(children) do
-        if not GraphicsOptimizer.Active then break end -- Dừng ngay nếu bị tắt
+        if not GraphicsOptimizer.Active then break end
         if obj:IsA("BasePart") then
             obj.CastShadow = false
             local name = obj.Name:lower()
@@ -159,7 +159,7 @@ function GraphicsOptimizer:Stop()
     end
     self.Connections = {}
     
-    -- Khôi phục đồ họa gốc
+    -- Khôi phục đồ họa gốc (Ánh sáng)
     restoreLighting()
 end
 
@@ -675,7 +675,7 @@ local TrackedElements = {}
 
 local function applyTranslation(inst)
     if not (inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox")) then return end
-    if inst:FindFirstAncestor("Chilli_LangToggle_Slate") then return end
+    if inst:FindFirstAncestor("Chilli_TopUI_Slate") then return end
 
     local original = inst:GetAttribute("OriginalRawText")
     if not original then
