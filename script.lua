@@ -1,7 +1,7 @@
 -- ==============================================================================
--- CHILLI HUB - MULTI-LANGUAGE TRANSLATOR V10.2 (EN/VI)
+-- CHILLI HUB - MULTI-LANGUAGE TRANSLATOR V10.3 (EN/VI)
 -- Tối ưu hóa:
--- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault.
+-- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault, Lab.
 -- 2. Đã xóa Module Hoàng Hôn & Chống Lag (Giữ nguyên đồ họa gốc của game).
 -- 3. Recursive Chunking: Quét UI đệ quy ngầm, loại bỏ 100% hiện tượng đơ khởi động.
 -- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
@@ -102,6 +102,14 @@ local MAP_VI = {
     ["Any"] = "Bất Kỳ",
     ["All"] = "Tất Cả",
     ["Tắt"] = "Tắt",
+
+    -- Cập nhật từ Ảnh Lab & Scrambled mới nhất
+    ["Lab is locked on this account"] = "Lab đã bị khóa trên tài khoản này",
+    ["Auto Lab Trade-In"] = "Tự Động Đổi Lab (Trade-In)",
+    ["Auto Reroll Lab Recipe"] = "Tự Động Đổi Công Thức Lab",
+    ["Place Lab Recipe Trứng"] = "Đặt Trứng Công Thức Lab",
+    ["Hatch Lab Recipe Trứng"] = "Ấp Trứng Công Thức Lab",
+    ["Tự Động Dùng Đột Biến Scrambled"] = "Tự Động Dùng Đột Biến Scrambled",
 
     -- Các menu điều hướng
     ["Farm Tab > Auto Steal"] = "Tab Cày Cuốc > Tự Động Cướp",
