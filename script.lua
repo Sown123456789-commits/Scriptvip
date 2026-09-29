@@ -1,7 +1,7 @@
 -- ==============================================================================
--- CHILLI HUB - MULTI-LANGUAGE TRANSLATOR V10.3 (EN/VI)
+-- CHILLI HUB - MULTI-LANGUAGE TRANSLATOR V10.4 (EN/VI)
 -- Tối ưu hóa:
--- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble Event, Auto Hunt Drone, Vault, Lab.
+-- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble, Lab, Boss Mastery, Unstable DNA.
 -- 2. Đã xóa Module Hoàng Hôn & Chống Lag (Giữ nguyên đồ họa gốc của game).
 -- 3. Recursive Chunking: Quét UI đệ quy ngầm, loại bỏ 100% hiện tượng đơ khởi động.
 -- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
@@ -110,6 +110,38 @@ local MAP_VI = {
     ["Place Lab Recipe Trứng"] = "Đặt Trứng Công Thức Lab",
     ["Hatch Lab Recipe Trứng"] = "Ấp Trứng Công Thức Lab",
     ["Tự Động Dùng Đột Biến Scrambled"] = "Tự Động Dùng Đột Biến Scrambled",
+
+    -- Cập nhật từ Ảnh Boss, Lab Banners & Scrambled Shop
+    ["Boss Đổi Máy Chủ Ngay"] = "Boss Đổi Máy Chủ Ngay",
+    ["After each boss, hops to a less crowded server to fight again"] = "Sau mỗi boss, chuyển sang server ít người hơn để đánh tiếp",
+    ["Tự Động Nhận Thưởng Mastery"] = "Tự Động Nhận Thưởng Mastery",
+    ["Claims Boss Mastery rewards as soon as they unlock"] = "Nhận thưởng Boss Mastery ngay khi mở khóa",
+    ["Keep Chuyểnping For"] = "Giữ Chuyển Server Trong",
+    ["Keeps fighting every boss it finds and hopping for this long"] = "Tiếp tục đánh mọi boss tìm thấy và chuyển server trong khoảng thời gian này",
+    ["Lab Banners"] = "Biểu Ngữ Lab (Lab Banners)",
+    ["Only trade and steal for these banners (empty = all)"] = "Chỉ đổi và cướp cho những biểu ngữ này (Trống = Tất cả)",
+    ["Tự Động Đổi Lab (Trade-In)"] = "Tự Động Đổi Lab (Trade-In)",
+    ["Auto Place Lab Reward Trứng"] = "Tự Động Đặt Trứng Thưởng Lab",
+    ["Places the reward eggs from Lab trades"] = "Đặt trứng thưởng nhận được từ giao dịch Lab",
+    ["Tự Động Mua Shop Scramble"] = "Tự Động Mua Shop Scramble",
+    ["Dùng Mẫu Vật để mua các món đồ đã chọn"] = "Dùng Mẫu Vật để mua các món đồ đã chọn",
+    ["Vật Phẩm Cửa Hàng Scramble"] = "Vật Phẩm Cửa Hàng Scramble",
+    ["Scrambled Mutation"] = "Đột Biến Scrambled",
+    ["Giữ Lại Mẫu Vật (Không mua hết)"] = "Giữ Lại Mẫu Vật (Không mua hết)",
+    ["Never spend below this many Samples"] = "Không bao giờ tiêu xuống dưới số Mẫu Vật này",
+    ["Tự Động Dùng Đột Biến Scrambled"] = "Tự Động Dùng Đột Biến Scrambled",
+    ["Need a Scrambled consumable"] = "Cần vật phẩm Scrambled",
+    ["Buy Scrambled from the event shop"] = "Mua Scrambled từ shop sự kiện",
+    ["Lượt Sạc"] = "Lượt Sạc",
+    ["Trứng"] = "Trứng",
+    ["Lần Thử"] = "Lần Thử",
+    ["Đã Áp Dụng"] = "Đã Áp Dụng",
+    ["Unstable DNA"] = "DNA Không Ổn Định (Unstable DNA)",
+    ["needs Toro, Salamander, Crustacia"] = "cần Toro, Salamander, Crustacia",
+    ["pity 0/100"] = "bảo hiểm 0/100",
+    ["free rerolls 0"] = "lượt quay free 0",
+    ["rotates in 38:45"] = "đổi sau 38:45",
+    ["Không Chọn"] = "Không Chọn",
 
     -- Các menu điều hướng
     ["Farm Tab > Auto Steal"] = "Tab Cày Cuốc > Tự Động Cướp",
@@ -398,6 +430,16 @@ local DYNAMIC_PATTERNS = {
         format = function(lang, timeStr) 
             if lang == "VI" then return "Cổng Mech tiếp theo sau " .. timeStr end 
             return "Next Mech portal in " .. timeStr 
+        end 
+    },
+    -- Regex xử lý Unstable DNA
+    { 
+        pattern = "^Unstable DNA %- needs (.-) %- pity (%d+)%/(%d+) %- free rerolls (%d+) %- rotates in (.-)$", 
+        format = function(lang, needs, pity1, pity2, reroll, timeStr) 
+            if lang == "VI" then 
+                return "DNA Không Ổn Định - cần " .. needs .. " - bảo hiểm " .. pity1 .. "/" .. pity2 .. " - lượt quay free " .. reroll .. " - đổi sau " .. timeStr 
+            end 
+            return "Unstable DNA - needs " .. needs .. " - pity " .. pity1 .. "/" .. pity2 .. " - free rerolls " .. reroll .. " - rotates in " .. timeStr 
         end 
     },
     -- Regex đếm số lượng Mẫu Vật & Phụ Tùng sự kiện Dr Scramble
