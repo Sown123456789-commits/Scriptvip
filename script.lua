@@ -15,7 +15,7 @@ local LocalPlayer = Players.LocalPlayer
 -- ==================== 1. NẠP CHILLI HUB GỐC (ƯU TIÊN SỐ 1) ====================
 task.spawn(function()
     pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/Chilli-Hub-Script/refs/heads/main/StealAnEgg"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"))()
     end)
 end)
 
