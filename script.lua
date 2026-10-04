@@ -13,7 +13,7 @@ local SCRIPT_URL = "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chil
 -- TỪ ĐIỂN 1: KHỚP CHÍNH XÁC (nhanh nhất, ưu tiên cao)
 -- =========================================================
 local EXACT_MATCH_VI = {
-    ["Chilli Hub"] = "Chilli Hub V2",
+    ["Chilli Hub"] = "Chilli Hub V3",
     ["Hop"] = "Đổi Server",
     ["Join"] = "Vào Phòng",
     ["Copy"] = "Sao Chép",
@@ -81,7 +81,7 @@ local EXACT_MATCH_VI = {
 -- TỪ ĐIỂN 2: THAY THẾ CỤM TỪ (fallback, xử lý câu dài)
 -- =========================================================
 local MAP_VI = {
-    ["Chilli Hub"] = "Chilli Hub V2",
+    ["Chilli Hub"] = "Chilli Hub V3",
     ["Farm"] = "Cày Cuốc",
     ["Player"] = "Người Chơi",
     ["Predictor"] = "Dự Đoán",
