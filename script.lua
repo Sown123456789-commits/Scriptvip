@@ -1,6 +1,6 @@
 -- =========================================================================
 -- 🌶️ KAI ROBLOX LOADER MENU V2.4 — UPDATE REQUIRED
--- Chỉ tập trung: thông báo update + nút copy link (KHÔNG chạy script chính)
+-- Chỉ tập trung: thông báo update + nút copy link (KHÔNG chạy script chính) 
 -- =========================================================================
 
 local TweenService = game:GetService("TweenService")
