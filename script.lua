@@ -1,771 +1,713 @@
--- ==============================================================================
--- CHILLI HUB - MULTI-LANGUAGE TRANSLATOR V10.4 (EN/VI)
--- Tối ưu hóa:
--- 1. Cập nhật 100% tiếng sự kiện mới: Dr Scramble, Lab, Boss Mastery, Unstable DNA.
--- 2. Đã xóa Module Hoàng Hôn & Chống Lag (Giữ nguyên đồ họa gốc của game).
--- 3. Recursive Chunking: Quét UI đệ quy ngầm, loại bỏ 100% hiện tượng đơ khởi động.
--- 4. Vòng xoay 2 ngôn ngữ (Anh/Việt) và Nút bấm Frosted Slate (Top-Center).
--- ==============================================================================
-local CoreGui = game:GetService("CoreGui")
+-- =========================================================
+-- CHILLI HUB TRANSLATOR V11.0 (EXACT + MAP DICTIONARY)
+-- Cơ chế: Polling 0.5s - Không hook event - Chống lag tuyệt đối
+-- Ưu tiên EXACT_MATCH_VI trước, fallback sang MAP_VI
+-- =========================================================
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 
--- ==================== 1. NẠP CHILLI HUB GỐC (ƯU TIÊN SỐ 1) ====================
-task.spawn(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"))()
-    end)
-end)
+local SCRIPT_URL = "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"
 
--- ==================== 2. HỆ THỐNG DỊCH THUẬT SONG NGỮ (EN/VI) ====================
-local currentLanguage = "VI"
-local translationLock = false
-local FastCache = {}
-
-local function safeReplace(str, findStr, replaceStr)
-    local startIdx, endIdx = str:find(findStr, 1, true)
-    if startIdx then
-        return str:sub(1, startIdx - 1) .. replaceStr .. str:sub(endIdx + 1)
-    end
-    return str
-end
-
-local MAP_VI = {
-    -- Các Tab Chính
-    ["Farm"] = "Cày Cuốc",
-    ["Player"] = "Người Chơi",
-    ["Egg Finder"] = "Máy Dò Trứng",
-    ["Predictor"] = "Soi Trứng",
-    ["Progress"] = "Tiến Độ",
-    ["Server"] = "Máy Chủ",
-    ["Misc"] = "Linh Tinh",
-    ["Creator"] = "Tác Giả",
-    ["Discord"] = "Discord",
-    ["Quick & Keys"] = "Phím Tắt",
-    ["Settings"] = "Cài Đặt",
-    ["Config"] = "Cấu Hình",
-    
-    -- === DR SCRAMBLE EVENT (SỰ KIỆN MỚI) ===
-    ["Dr Scramble Event"] = "Sự Kiện Dr Scramble",
-    ["Auto Hunt Drones"] = "Tự Động Săn Drone",
-    ["Kill drones during outbreaks for Samples and Drone Parts"] = "Tiêu diệt drone khi bùng phát để lấy Mẫu Vật và Phụ Tùng",
-    ["Hunt Priority"] = "Ưu Tiên Săn",
-    ["Most HP First"] = "Nhiều Máu Nhất Trước",
-    ["Drone Types"] = "Loại Drone",
-    ["Hunt Travel Method"] = "Cách Thức Di Chuyển",
-    ["Teleport only to drones within 50 studs, farther ones are tweened"] = "Dịch chuyển nếu dưới 50 studs, xa hơn sẽ dùng Tween bay tới",
-    ["Hunt Tween Speed"] = "Tốc Độ Bay (Tween) Săn",
-    ["Only Until Vault Parts Found"] = "Dừng Khi Đủ Phụ Tùng Hầm",
-    ["Auto Collect Lost Parts"] = "Tự Nhặt Phụ Tùng Rơi",
-    ["Collect the 2 Lost Parts for the vault"] = "Thu thập đủ 2 Phụ Tùng Rơi để mở hầm",
-    ["Auto Open Vault"] = "Tự Động Mở Hầm Chứa",
-    ["Open the vault when all 5 parts are found"] = "Tự mở khóa hầm khi đã thu thập đủ 5 phụ tùng",
-    ["Auto Buy Scramble Shop"] = "Tự Động Mua Shop Scramble",
-    ["Buy the picked items with Samples"] = "Dùng Mẫu Vật để mua các món đồ đã chọn",
-    ["Scramble Shop Items"] = "Vật Phẩm Cửa Hàng Scramble",
-    ["Keep Samples"] = "Giữ Lại Mẫu Vật (Không mua hết)",
-    ["Go To Secret Cave"] = "Đi Đến Hang Động Bí Ẩn (Secret)",
-    
-    -- Cập nhật từ Ảnh Dr Scramble Mech & Scrambled Mutation
-    ["Dr Scramble Mech"] = "Mech Dr Scramble",
-    ["Dr Scramble Mech (New)"] = "Mech Dr Scramble (Mới)",
-    ["Next Mech portal in"] = "Cổng Mech tiếp theo sau",
-    ["Auto Mech Boss"] = "Tự Động Đánh Boss Mech",
-    ["Mech Tốc Độ Bay (Tween)"] = "Mech Tốc Độ Bay (Tween)",
-    ["Main Weapon Hold"] = "Giữ Vũ Khí Chính",
-    ["Scrambler Hold"] = "Giữ Máy Gây Nhiễu",
-    ["Swap Two Weapons"] = "Đổi Hai Vũ Khí",
-    ["Dodge Attacks"] = "Né Đòn Tấn Công",
-    ["Anti Guard"] = "Chống Vệ Sĩ",
-    ["Ball And Core Phase"] = "Giai Đoạn Bóng & Lõi",
-    ["Leave After Fight"] = "Rời Đi Sau Khi Đánh",
-    ["Auto Use Scrambled Mutation"] = "Tự Động Dùng Đột Biến Scrambled",
-    ["Idle"] = "Đang Chờ",
-    ["Turn it on to start applying Scrambled"] = "Bật lên để bắt đầu áp dụng Scrambled",
-    ["Charges"] = "Lượt Sạc",
-    ["Eggs"] = "Trứng",
-    ["Tries"] = "Lần Thử",
-    ["Applied"] = "Đã Áp Dụng",
-    ["Mutation Độ Hiếm Tối Thiểu"] = "Độ Hiếm Đột Biến Tối Thiểu",
-    ["Only eggs of this rarity and above are used"] = "Chỉ dùng trứng từ độ hiếm này trở lên",
-    ["Min Mutation Giá Trị"] = "Giá Trị Đột Biến Tối Thiểu",
-    ["Bỏ qua trứng rẻ hơn mức này (0 = Tắt)"] = "Bỏ qua trứng rẻ hơn mức này (0 = Tắt)",
-    ["Mutation Priority"] = "Ưu Tiên Đột Biến",
-    ["Giá Trị Cao Nhất"] = "Giá Trị Cao Nhất",
-    ["Which egg gets the consumable first"] = "Trứng nào nhận vật phẩm tiêu hao trước",
-    ["Mutation Target Eggs"] = "Trứng Mục Tiêu Đột Biến",
-    ["Only use the consumable on these eggs (empty = all)"] = "Chỉ dùng vật phẩm này lên những trứng này (Trống = Tất cả)",
-    ["Auto Buy Scrambled"] = "Tự Động Mua Scrambled",
-    ["Buy another Scrambled from the event shop when you run out"] = "Tự mua thêm Scrambled từ shop sự kiện khi hết",
-    ["Any"] = "Bất Kỳ",
-    ["All"] = "Tất Cả",
-    ["Tắt"] = "Tắt",
-
-    -- Cập nhật từ Ảnh Lab & Scrambled mới nhất
-    ["Lab is locked on this account"] = "Lab đã bị khóa trên tài khoản này",
-    ["Auto Lab Trade-In"] = "Tự Động Đổi Lab (Trade-In)",
-    ["Auto Reroll Lab Recipe"] = "Tự Động Đổi Công Thức Lab",
-    ["Place Lab Recipe Trứng"] = "Đặt Trứng Công Thức Lab",
-    ["Hatch Lab Recipe Trứng"] = "Ấp Trứng Công Thức Lab",
-    ["Tự Động Dùng Đột Biến Scrambled"] = "Tự Động Dùng Đột Biến Scrambled",
-
-    -- Cập nhật từ Ảnh Boss, Lab Banners & Scrambled Shop
-    ["Boss Đổi Máy Chủ Ngay"] = "Boss Đổi Máy Chủ Ngay",
-    ["After each boss, hops to a less crowded server to fight again"] = "Sau mỗi boss, chuyển sang server ít người hơn để đánh tiếp",
-    ["Tự Động Nhận Thưởng Mastery"] = "Tự Động Nhận Thưởng Mastery",
-    ["Claims Boss Mastery rewards as soon as they unlock"] = "Nhận thưởng Boss Mastery ngay khi mở khóa",
-    ["Keep Chuyểnping For"] = "Giữ Chuyển Server Trong",
-    ["Keeps fighting every boss it finds and hopping for this long"] = "Tiếp tục đánh mọi boss tìm thấy và chuyển server trong khoảng thời gian này",
-    ["Lab Banners"] = "Biểu Ngữ Lab (Lab Banners)",
-    ["Only trade and steal for these banners (empty = all)"] = "Chỉ đổi và cướp cho những biểu ngữ này (Trống = Tất cả)",
-    ["Tự Động Đổi Lab (Trade-In)"] = "Tự Động Đổi Lab (Trade-In)",
-    ["Auto Place Lab Reward Trứng"] = "Tự Động Đặt Trứng Thưởng Lab",
-    ["Places the reward eggs from Lab trades"] = "Đặt trứng thưởng nhận được từ giao dịch Lab",
-    ["Tự Động Mua Shop Scramble"] = "Tự Động Mua Shop Scramble",
-    ["Dùng Mẫu Vật để mua các món đồ đã chọn"] = "Dùng Mẫu Vật để mua các món đồ đã chọn",
-    ["Vật Phẩm Cửa Hàng Scramble"] = "Vật Phẩm Cửa Hàng Scramble",
-    ["Scrambled Mutation"] = "Đột Biến Scrambled",
-    ["Giữ Lại Mẫu Vật (Không mua hết)"] = "Giữ Lại Mẫu Vật (Không mua hết)",
-    ["Never spend below this many Samples"] = "Không bao giờ tiêu xuống dưới số Mẫu Vật này",
-    ["Tự Động Dùng Đột Biến Scrambled"] = "Tự Động Dùng Đột Biến Scrambled",
-    ["Need a Scrambled consumable"] = "Cần vật phẩm Scrambled",
-    ["Buy Scrambled from the event shop"] = "Mua Scrambled từ shop sự kiện",
-    ["Lượt Sạc"] = "Lượt Sạc",
-    ["Trứng"] = "Trứng",
-    ["Lần Thử"] = "Lần Thử",
-    ["Đã Áp Dụng"] = "Đã Áp Dụng",
-    ["Unstable DNA"] = "DNA Không Ổn Định (Unstable DNA)",
-    ["needs Toro, Salamander, Crustacia"] = "cần Toro, Salamander, Crustacia",
-    ["pity 0/100"] = "bảo hiểm 0/100",
-    ["free rerolls 0"] = "lượt quay free 0",
-    ["rotates in 38:45"] = "đổi sau 38:45",
-    ["Không Chọn"] = "Không Chọn",
-
-    -- Các menu điều hướng
-    ["Farm Tab > Auto Steal"] = "Tab Cày Cuốc > Tự Động Cướp",
-    ["Farm Tab > Auto Place Egg"] = "Tab Cày Cuốc > Tự Đặt Trứng",
-    ["Farm Tab > Auto Treadmill"] = "Tab Cày Cuốc > Tự Chạy Máy Tập",
-    ["Farm Tab > Auto Hatch & Equip"] = "Tab Cày Cuốc > Tự Ấp & Thay Thú",
-    ["Farm Tab > Auto Sell"] = "Tab Cày Cuốc > Tự Động Bán",
-    ["Farm Tab > Auto Fuse Machine"] = "Tab Cày Cuốc > Tự Máy Ghép",
-    ["Farm Tab > Auto Favorite"] = "Tab Cày Cuốc > Tự Khóa Thú",
-    ["Farm Tab > Auto Rift & Boss"] = "Tab Cày Cuốc > Tự Động Rift & Boss",
-    ["Player Tab > ESP"] = "Tab Người Chơi > Xuyên Tường (ESP)",
-    ["Player Tab > Movement"] = "Tab Người Chơi > Di Chuyển",
-    ["Player Tab > Character"] = "Tab Người Chơi > Nhân Vật",
-    ["Egg Finder Tab > Egg Finder"] = "Tab Tìm Trứng > Máy Dò Trứng",
-    ["Predictor Tab > Discord Webhook"] = "Tab Dự Đoán > Webhook Discord",
-    ["Predictor Tab > Egg Predictor"] = "Tab Dự Đoán > Soi Trứng",
-    ["Predictor Tab > Fuse Predictor"] = "Tab Dự Đoán > Soi Tỷ Lệ Ghép",
-    ["Progress Tab > Auto Progression"] = "Tab Tiến Độ > Tự Động Thăng Tiến",
-    ["Server Tab > Server"] = "Tab Máy Chủ > Máy Chủ",
-    ["Misc Tab > Performance"] = "Tab Linh Tinh > Hiệu Năng",
-    ["Misc Tab > Utility"] = "Tab Linh Tinh > Tiện Ích",
-    ["Discord Tab > Creator Event"] = "Tab Discord > Sự Kiện Tác Giả",
-    ["Discord Tab > Community"] = "Tab Discord > Cộng Đồng",
-    ["Quick & Keys Tab > Quick Access"] = "Tab Phím Tắt > Truy Cập Nhanh",
-    ["Quick & Keys Tab > Quick Bar & Keybinds"] = "Tab Phím Tắt > Thanh Nhanh & Gán Phím",
-    ["Settings Tab > Interface"] = "Tab Cài Đặt > Giao Diện",
-    ["Settings Tab > Defaults"] = "Tab Cài Đặt > Mặc Định",
-    ["Config Tab > Config"] = "Tab Cấu Hình > Cấu Hình",
-    ["Config Tab > Profiles"] = "Tab Cấu Hình > Hồ Sơ",
-    ["Config Tab > Import/Export"] = "Tab Cấu Hình > Nhập/Xuất",
-
-    -- Các tính năng
-    ["Auto Steal"] = "Tự Động Cướp",
-    ["Target Areas"] = "Khu Vực Mục Tiêu",
-    ["Min Rarity"] = "Độ Hiếm Tối Thiểu",
-    ["Steal eggs of the chosen rarity and every rarity above it"] = "Cướp trứng từ độ hiếm đã chọn trở lên",
-    ["Min Value To Steal"] = "Giá Trị Cướp Tối Thiểu",
-    ["Skip eggs worth less than this (0 = off)"] = "Bỏ qua trứng rẻ hơn mức này (0 = Tắt)",
-    ["Target Specific Eggs"] = "Nhắm Trứng Cụ Thể",
-    ["Only steal these eggs (empty = all)"] = "Chỉ cướp những trứng này (Trống = Tất cả)",
-    ["Prioritize Rift Recipe Eggs"] = "Ưu Tiên Trứng Rift",
-    ["Steal eggs the Rift recipe needs first"] = "Cướp trứng cần cho Rift trước",
-    ["Steal Priority"] = "Ưu Tiên Cướp",
-    ["Highest Value"] = "Giá Trị Cao Nhất",
-    ["Tween Speed"] = "Tốc Độ Bay (Tween)",
-    ["Anti Guard V1"] = "Chống Vệ Sĩ V1",
-    ["Not recommended to use with Auto Steal"] = "Không khuyên dùng cùng Tự Động Cướp",
-    ["Auto Place Egg"] = "Tự Động Đặt Trứng",
-    ["Place Egg Rule"] = "Quy Tắc Đặt Trứng",
-    ["Place Egg Priority"] = "Ưu Tiên Đặt Trứng",
-    ["Biggest Size"] = "Kích Thước Lớn Nhất",
-    ["Always"] = "Luôn Luôn",
-    ["Auto Treadmill"] = "Tự Chạy Máy Tập",
-    ["Stay On Treadmill"] = "Giữ Trên Máy Tập",
-    ["Re-mount the belt whenever the ride drops"] = "Tự trèo lên lại nếu bị rớt",
-    ["Auto Hatch & Equip"] = "Tự Ấp & Thay Thú",
-    ["Auto Hatch"] = "Tự Động Ấp",
-    ["Auto Equip Best"] = "Tự Mặc Đồ Xịn Nhất",
-    ["Equip Best when a better pet appears"] = "Tự đổi thú xịn hơn khi có",
-    ["Auto Sell"] = "Tự Động Bán",
-    ["Auto Sell Pet"] = "Tự Động Bán Thú",
-    ["Sell Pets Now"] = "Bán Thú Ngay",
-    ["Sell Pet Rule"] = "Quy Tắc Bán Thú",
-    ["Which checks must pass to sell"] = "Điều kiện cần thỏa mãn để bán",
-    ["Rarity Only"] = "Chỉ Xét Độ Hiếm",
-    ["Pet Max Rarity"] = "Độ Hiếm Thú Tối Đa",
-    ["Sell pets at or below this rarity"] = "Bán thú từ độ hiếm này trở xuống",
-    ["Pet Value Threshold"] = "Ngưỡng Giá Trị Thú",
-    ["Sell pets worth less than this (0 = off)"] = "Bán thú rẻ hơn mức này (0 = Tắt)",
-    ["Keep Mutated Pets"] = "Giữ Thú Đột Biến",
-    ["Never sell mutated pets"] = "Tuyệt đối không bán thú đột biến",
-    ["Blacklist Sell Pets"] = "Danh Sách Đen (Không Bán)",
-    ["These pets are never sold"] = "Những thú này sẽ không bao giờ bị bán",
-    ["Auto Sell Egg"] = "Tự Động Bán Trứng",
-    ["Sell bag eggs matching the rules below"] = "Bán trứng trong túi theo luật dưới đây",
-    ["Sell Eggs Now"] = "Bán Trứng Ngay",
-    ["Sell matching eggs once"] = "Bán trứng đúng điều kiện một lần",
-    ["Sell Egg Rule"] = "Quy Tắc Bán Trứng",
-    ["Egg Max Rarity"] = "Độ Hiếm Trứng Tối Đa",
-    ["Sell eggs at or below this rarity"] = "Bán trứng từ độ hiếm này trở xuống",
-    ["Egg Value Threshold"] = "Ngưỡng Giá Trị Trứng",
-    ["Sell eggs worth less than this (0 = off)"] = "Bán trứng rẻ hơn mức này (0 = Tắt)",
-    ["Keep Mutated Eggs"] = "Giữ Trứng Đột Biến",
-    ["Never sell mutated eggs"] = "Tuyệt đối không bán trứng đột biến",
-    ["Blacklist Sell Eggs"] = "Danh Sách Đen Trứng",
-    ["These eggs are never sold"] = "Những trứng này sẽ không bao giờ bị bán",
-    ["Auto Fuse Machine"] = "Tự Động Máy Ghép",
-    ["Fuse 3 same pets into an egg, nonstop"] = "Liên tục ghép 3 thú giống nhau",
-    ["Fuse Priority Mode"] = "Chế Độ Ưu Tiên Ghép",
-    ["Lowest Rarity First"] = "Độ Hiếm Thấp Trộn Trước",
-    ["Pets To Use"] = "Thú Cưng Sử Dụng",
-    ["Lowest To Highest"] = "Từ Thấp Đến Cao",
-    ["Max Rarity to Fuse"] = "Độ Hiếm Ghép Tối Đa",
-    ["Specific Species to Fuse"] = "Chỉ Ghép Loài Thú Này",
-    ["Only fuse these species (empty = all)"] = "Chỉ ghép những loài này (Trống = Tất cả)",
-    ["Skip Mutated Pets"] = "Bỏ Qua Thú Đột Biến",
-    ["Eject Incomplete Slots"] = "Đẩy Ra Ô Chưa Đủ",
-    ["Take out pets that can't make a set"] = "Lấy ra thú không đủ bộ 3 con",
-    ["Auto Favorite"] = "Tự Động Khóa Thú",
-    ["Auto Favorite Pet"] = "Tự Động Khóa Thú",
-    ["Favorite pets matching the rules below"] = "Khóa thú thỏa mãn luật bên dưới",
-    ["Favorite Pets Now"] = "Khóa Thú Ngay",
-    ["Favorite matching pets once"] = "Khóa thú đúng điều kiện 1 lần",
-    ["Favorite Rule"] = "Quy Tắc Khóa",
-    ["Pass any check or all checks"] = "Thỏa 1 điều kiện hoặc tất cả",
-    ["Match All"] = "Khớp Tất Cả",
-    ["Favorite Min Rarity"] = "Độ Hiếm Khóa Min",
-    ["Favorite pets of the chosen rarity and every rarity above it"] = "Khóa thú từ độ hiếm này trở lên",
-    ["Favorite Mutations"] = "Khóa Thú Đột Biến",
-    ["Mutation check (empty = skip)"] = "Kiểm tra đột biến (Trống = Bỏ qua)",
-    ["Favorite Min Value"] = "Giá Trị Khóa Min",
-    ["Value check (0 = skip)"] = "Kiểm tra giá trị (0 = Bỏ qua)",
-    ["Always Favorite Species"] = "Luôn Khóa Loài Này",
-    ["Always favorite these species"] = "Luôn khóa những loài thú này",
-    ["Auto Favorite Equipped"] = "Tự Khóa Thú Đang Dùng",
-    ["Keep equipped pets favorited"] = "Giữ thú đang trang bị ở trạng thái khóa",
-    ["Auto Unfavorite Equipped"] = "Tự Mở Khóa Thú Đang Dùng",
-    ["Unfavorite equipped pets not in the rules"] = "Mở khóa nếu không đúng luật",
-    ["Favorite Equipped Now"] = "Khóa Thú Đang Dùng Ngay",
-    ["Favorite all equipped pets once"] = "Khóa tất cả thú đang dùng",
-    ["Unfavorite Equipped Now"] = "Mở Khóa Thú Đang Dùng Ngay",
-    ["Unfavorite all equipped pets once"] = "Mở khóa tất cả thú đang dùng",
-    ["Auto Rift & Boss"] = "Tự Động Rift & Boss",
-    ["Auto Rift Sacrifice"] = "Tự Động Hiến Tế Rift",
-    ["Trade the 3 required pets into the Rift machine"] = "Tự nạp 3 thú yêu cầu vào máy Rift",
-    ["Auto Reroll Rift Recipe"] = "Tự Động Đổi Công Thức Rift",
-    ["Reroll the recipe when a pet is missing and free rerolls remain"] = "Đổi công thức nếu thiếu thú và còn lượt free",
-    ["Auto Claim Boss Mastery"] = "Tự Nhận Thưởng Boss",
-    ["Claim milestone rewards as soon as the kill count allows"] = "Nhận mốc thưởng ngay khi đủ điểm hạ gục",
-    ["Auto Fight Boss"] = "Tự Động Đánh Boss",
-    ["Auto Progression"] = "Tự Động Thăng Tiến",
-    ["Auto Buy Trail"] = "Tự Động Mua Vệt Sáng",
-    ["Automatically buy available trails when affordable"] = "Tự động mua vệt sáng khi đủ tiền",
-    ["Auto Upgrade Base"] = "Tự Động Nâng Cấp Căn Cứ",
-    ["Automatically upgrade base when money is available"] = "Tự động nâng cấp căn cứ khi có tiền",
-    ["Auto Upgrade Treadmill"] = "Tự Động Nâng Cấp Máy Tập",
-    ["Automatically upgrade treadmill when money is available"] = "Tự động nâng cấp máy tập khi có tiền",
-    ["Auto Claim"] = "Tự Động Nhận Thưởng",
-    ["Claim offline money & index rewards"] = "Nhận tiền offline & thưởng danh mục",
-    ["ESP"] = "Xuyên Tường (ESP)",
-    ["ESP Eggs"] = "Hiển Thị Trứng",
-    ["ESP Fixed Size"] = "Cố Định Kích Cỡ ESP",
-    ["ESP Own Base Eggs"] = "Hiển Thị Trứng Căn Cứ Mình",
-    ["Also show the eggs placed in your own base"] = "Hiện cả trứng đã đặt trong căn cứ của bạn",
-    ["ESP Min Rarity"] = "Độ Hiếm Tối Thiểu ESP",
-    ["Show eggs of the chosen rarity and every rarity above it"] = "Hiện trứng từ độ hiếm này trở lên",
-    ["ESP Show Info"] = "Hiện Thông Tin ESP",
-    ["ESP Min Value"] = "Giá Trị ESP Tối Thiểu",
-    ["ESP Egg Size"] = "Kích Cỡ Trứng ESP",
-    ["ESP Guards"] = "Hiển Thị Vệ Sĩ",
-    ["ESP Guard Size"] = "Kích Cỡ Vệ Sĩ ESP",
-    ["ESP Players"] = "Hiển Thị Người Chơi",
-    ["ESP Player Info"] = "Thông Tin Người Chơi ESP",
-    ["ESP Player Size"] = "Kích Cỡ Người Chơi ESP",
-    ["Movement"] = "Di Chuyển",
-    ["Speed Boost"] = "Tăng Tốc Di Chuyển",
-    ["Boost Speed"] = "Tốc Độ Tăng Cường",
-    ["Infinite Jump"] = "Nhảy Vô Hạn",
-    ["Character"] = "Nhân Vật",
-    ["Anti Ragdoll"] = "Chống Ngã (Ragdoll)",
-    ["Anti Trap"] = "Chống Bẫy",
-    ["Traps from other players cannot catch you"] = "Bẫy của người khác không bắt được bạn",
-    ["Instant Steal"] = "Cướp Tức Thì",
-    ["IDLE"] = "ĐANG CHỜ LỆNH",
-    ["Turn on Egg Finder to start hunting"] = "Bật Máy Dò Trứng để bắt đầu săn",
-    ["Keep hopping servers until a matching egg is found"] = "Đổi server liên tục tới khi thấy trứng đúng luật",
-    ["Link To Auto Steal Filters"] = "Dùng Chung Bộ Lọc Tự Động Cướp",
-    ["Share one set of filters with Auto Steal, both sides stay in step"] = "Đồng bộ hóa bộ lọc với tab Tự Động Cướp",
-    ["Min Value To Find"] = "Giá Trị Trứng Tối Thiểu",
-    ["Hop Only When Rarity Appears"] = "Chỉ Đổi Server Khi Thấy Độ Hiếm Này",
-    ["Wait for the chosen rarity to appear, then hop until night"] = "Chờ độ hiếm xuất hiện, sau đó đổi server liên tục",
-    ["Rarity That Must Appear"] = "Độ Hiếm Bắt Buộc Xuất Hiện",
-    ["Hop starts when this rarity or higher appears"] = "Đổi server khi độ hiếm này xuất hiện",
-    ["Hop Delay"] = "Độ Trễ Đổi Server",
-    ["Egg Predictor"] = "Soi Trứng (Predictor)",
-    ["Sort By"] = "Sắp Xếp Theo",
-    ["Value"] = "Giá Trị",
-    ["Preview Card"] = "Xem Thẻ Trước",
-    ["Search eggs..."] = "Tìm kiếm trứng...",
-    ["Tap an egg below to preview it"] = "Chạm vào trứng bên dưới để xem chi tiết",
-    ["In inventory"] = "Trong túi",
-    ["Hold egg"] = "Đang giữ",
-    ["Fuse Predictor"] = "Soi Tỷ Lệ Ghép (Fuse)",
-    ["Machine is empty"] = "Máy đang trống",
-    ["Load 3 pets of the same species to see the result odds"] = "Cho 3 thú cùng loài vào để xem tỷ lệ kết quả",
-    ["Search"] = "Tìm Kiếm",
-    ["Auto Load Script"] = "Tự Động Nạp Script",
-    ["Server Hop Mode"] = "Chế Độ Đổi Server",
-    ["Least Players"] = "Ít Người Chơi Nhất",
-    ["Server Hop"] = "Đổi Server Ngay",
-    ["Job ID"] = "ID Máy Chủ (Job ID)",
-    ["Paste a server Job ID..."] = "Dán ID máy chủ vào đây...",
-    ["Join Job ID"] = "Vào Bằng ID",
-    ["Copy Current Job ID"] = "Chép ID Máy Chủ Hiện Tại",
-    ["Rejoin Server"] = "Vào Lại Máy Chủ Này",
-    ["Join"] = "Vào",
-    ["Copy"] = "Chép",
+-- =========================================================
+-- TỪ ĐIỂN 1: KHỚP CHÍNH XÁC (nhanh nhất, ưu tiên cao)
+-- =========================================================
+local EXACT_MATCH_VI = {
+    ["Chilli Hub"] = "Chilli Hub V2",
+    ["Hop"] = "Đổi Server",
+    ["Join"] = "Vào Phòng",
+    ["Copy"] = "Sao Chép",
     ["Rejoin"] = "Vào Lại",
-    ["Hop"] = "Chuyển",
-    ["Performance"] = "Hiệu Năng",
-    ["FPS Cap"] = "Giới Hạn FPS",
-    ["Optimizer"] = "Tối Ưu Hóa Tối Đa",
-    ["Strip shadows, textures and effects for the highest FPS"] = "Tắt bóng, kết cấu và hiệu ứng để đạt FPS cao nhất",
-    ["FPS and Ping"] = "Hiện FPS & Ping",
-    ["FPS and Ping Size"] = "Cỡ Chữ FPS & Ping",
-    ["Utility"] = "Tiện Ích",
-    ["Anti AFK"] = "Chống Treo Máy (AFK)",
-    ["Creator Event"] = "Sự Kiện Của Tác Giả",
-    ["INVITE LINK"] = "LIÊN KẾT MỜI",
-    ["Copy Link"] = "Sao Chép Link",
-    ["WHAT YOU GET"] = "BẠN NHẬN ĐƯỢC GÌ",
-    ["New Scripts & Updates"] = "Script & Cập Nhật Mới",
-    ["Patch notes and new game scripts are posted there first."] = "Chi tiết cập nhật và script game mới được đăng ở đây đầu tiên.",
-    ["Giveaways"] = "Tặng Quà (Giveaways)",
-    ["Member giveaways and events are announced in the server."] = "Sự kiện và phát quà cho thành viên được thông báo trong server.",
-    ["Support"] = "Hỗ Trợ",
-    ["Ask for help, report bugs and get answers from the team."] = "Hỏi đáp, báo lỗi và nhận hỗ trợ từ nhóm phát triển.",
-    ["Suggestions"] = "Đóng Góp Ý Kiến",
-    ["Request features and vote on what gets added next."] = "Yêu cầu tính năng và bình chọn cập nhật tiếp theo.",
-    ["Paste the copied link into your browser or the Discord app to join."] = "Dán link vừa chép vào trình duyệt hoặc app Discord để tham gia.",
-    ["Copy Discord Link"] = "Chép Link Discord",
-    ["Click"] = "Bấm",
-    ["Quick Access"] = "Truy Cập Nhanh",
-    ["Show Quick Bars"] = "Hiện Thanh Phím Tắt",
-    ["Floating quick bars; drag a header to move one"] = "Thanh phím tắt nổi; kéo tiêu đề để di chuyển",
-    ["Visible Quick Bars"] = "Các Thanh Đang Hiện",
-    ["Quick Bar Size"] = "Kích Cỡ Thanh Phím Tắt",
-    ["Quick Bar & Keybinds"] = "Thanh Phím Tắt & Gán Nút",
-    ["Reset Quick Access"] = "Đặt Lại Truy Cập Nhanh",
-    ["Restore default items, bars and positions"] = "Khôi phục lại vị trí thanh mặc định",
-    ["Reset Keybinds"] = "Đặt Lại Nút Gán",
-    ["Restore the defaults set in code"] = "Khôi phục lại nút gán mặc định",
-    ["Reset"] = "Đặt Lại",
-    ["Interface"] = "Giao Diện",
-    ["UI Size"] = "Kích Cỡ Giao Diện",
-    ["Scales the main window; the corner grip does the same by hand"] = "Đổi cỡ cửa sổ; kéo góc dưới cùng bên phải để đổi thủ công",
-    ["Notifications"] = "Bật Thông Báo",
-    ["Show notification cards; turning this off hides every notify"] = "Hiện thẻ thông báo; tắt mục này sẽ ẩn toàn bộ",
-    ["Open On Launch"] = "Mở Khi Khởi Chạy",
-    ["Open the UI automatically when the script starts"] = "Tự động hiện bảng menu khi script bắt đầu",
-    ["Defaults"] = "Mặc Định",
-    ["Reset to Defaults"] = "Đặt Lại Về Mặc Định",
-    ["Reset every feature to its built-in default"] = "Khôi phục mọi tính năng về mặc định gốc",
-    ["Turn Off All Toggles"] = "Tắt Tất Cả Công Tắc",
-    ["Switch off every enabled toggle in the feature tabs"] = "Tắt mọi công tắc đang bật trong các tab",
-    ["Turn Off"] = "Tắt Ngay",
-    ["Auto Save Config"] = "Tự Động Lưu Cấu Hình",
-    ["Auto Load Config"] = "Tự Động Nạp Cấu Hình",
-    ["New Config Name"] = "Tên Cấu Hình Mới",
-    ["Create New Config"] = "Tạo Cấu Hình Mới",
-    ["Save Config"] = "Lưu Cấu Hình Hiện Tại",
-    ["Import Config Text"] = "Nhập Mã Văn Bản Cấu Hình",
-    ["Destination"] = "Nơi Nhận Thông Báo",
-    ["Webhook URL"] = "Đường Dẫn Webhook",
-    ["Notify Egg Finder Match"] = "Báo Khi Máy Dò Khớp Trứng",
-    ["Post the egg Egg Finder stops hopping for"] = "Gửi cảnh báo quả trứng mà Máy Dò vừa tìm được",
-    ["Notify Stolen Eggs"] = "Báo Khi Cướp Được Trứng",
-    ["Post every egg you bring home"] = "Gửi thông báo mỗi khi bạn cướp thành công mang về nhà",
-    ["None"] = "Không Chọn",
-    ["Off"] = "Tắt",
-    ["Filter features..."] = "Lọc tính năng...",
-    ["Favorite"] = "Khóa Lại",
-    ["Unfavorite"] = "Mở Khóa",
+    ["Add"] = "Thêm",
     ["Sell"] = "Bán",
-    ["Mythic"] = "Thần Thoại (Mythic)",
-    ["Secret"] = "Bí Ẩn (Secret)",
+    ["Favorite"] = "Khóa",
+    ["Unfavorite"] = "Mở Khóa",
+    ["RESET"] = "ĐẶT LẠI",
+    ["All"] = "Tất cả",
+    ["ALL"] = "TẤT CẢ",
+    ["Any"] = "Tất cả",
+    ["None"] = "Không có",
+    ["Off"] = "Tắt",
+    ["OFF"] = "TẮT",
+    ["On"] = "Bật",
+    ["ON"] = "BẬT",
+    ["Idle"] = "Đang chờ",
+    ["IDLE"] = "ĐANG CHỜ",
+    ["Stand"] = "Đứng yên",
+    ["Chase"] = "Đuổi theo",
+    ["Circle"] = "Xoay vòng",
+    ["Patrol"] = "Tuần tra",
+    ["Rarest"] = "Hiếm nhất",
+    ["Nearest"] = "Gần nhất",
+    ["Always"] = "Luôn luôn",
+    ["Never"] = "Không bao giờ",
+    ["Value"] = "Giá trị",
+    ["Cosmic"] = "Vũ Trụ (Cosmic)",
     ["Divine"] = "Thánh Thần (Divine)",
     ["Eternal"] = "Vĩnh Cửu (Eternal)",
-    ["Cosmic"] = "Vũ Trụ (Cosmic)",
+    ["Mythic"] = "Thần Thoại (Mythic)",
     ["Legendary"] = "Huyền Thoại (Legendary)",
-    ["Window Minimized - Click bubble to restore"] = "Cửa sổ đã thu nhỏ - Bấm bong bóng để mở lại",
-    ["Let's Chat!"] = "Trò Chuyện Nào!",
-    ["Connecting to Global Script Chat..."] = "Đang kết nối chat thế giới...",
-    ["Send"] = "Gửi",
-    ["Live"] = "Trực Tiếp",
-    ["Spoof anti cheat success!"] = "Đã vượt qua Anti-Cheat thành công!",
-    ["Fetching..."] = "Đang Tải Dữ Liệu...",
-    ["Loaded"] = "Đã Nạp Xong"
+    ["Epic"] = "Sử Thi (Epic)",
+    ["Rare"] = "Hiếm (Rare)",
+    ["Uncommon"] = "Thường (Uncommon)",
+    ["Common"] = "Phổ Thông (Common)",
+    ["Secret"] = "Bí Ẩn (Secret)",
+    ["Least Players"] = "Ít người chơi nhất",
+    ["Steal Then Hop"] = "Cướp xong đổi server",
+    ["Rarity Only"] = "Chỉ theo độ hiếm",
+    ["Rarity And Value"] = "Độ hiếm & Giá trị",
+    ["Value Only"] = "Chỉ theo giá trị",
+    ["Lowest Rarity First"] = "Độ hiếm thấp trước",
+    ["Lowest To Highest"] = "Từ thấp đến cao",
+    ["Highest To Lowest"] = "Từ cao đến thấp",
+    ["Match All"] = "Khớp tất cả",
+    ["Match Any"] = "Khớp bất kỳ",
+    ["Highest Value"] = "Giá trị cao nhất",
+    ["Lowest Value"] = "Giá trị thấp nhất",
+    ["3 - Rare"] = "3 - Hiếm (Rare)",
+    ["6 - Mythic"] = "6 - Thần Thoại (Mythic)",
+    ["EGGS"] = "TRỨNG",
+    ["READY"] = "SẴN SÀNG",
+    ["GROWING"] = "ĐANG LỚN",
+    ["IN BAG"] = "TRONG TÚI",
+    ["TOTAL / S"] = "TỔNG / GIÂY",
+    ["SCRAMBLED"] = "ĐÃ BIẾN ĐỔI",
+    ["GOLDEN"] = "VÀNG",
+    ["SILVER"] = "BẠC",
+    ["RAINBOW"] = "CẦU VỒNG"
 }
 
--- Mẫu Regex xử lý chuỗi động đa ngôn ngữ (Chỉ EN/VI)
-local DYNAMIC_PATTERNS = {
-    -- Regex đếm ngược thời gian Mech Portal
-    { 
-        pattern = "^Next Mech portal in (.-)$", 
-        format = function(lang, timeStr) 
-            if lang == "VI" then return "Cổng Mech tiếp theo sau " .. timeStr end 
-            return "Next Mech portal in " .. timeStr 
-        end 
-    },
-    -- Regex xử lý Unstable DNA
-    { 
-        pattern = "^Unstable DNA %- needs (.-) %- pity (%d+)%/(%d+) %- free rerolls (%d+) %- rotates in (.-)$", 
-        format = function(lang, needs, pity1, pity2, reroll, timeStr) 
-            if lang == "VI" then 
-                return "DNA Không Ổn Định - cần " .. needs .. " - bảo hiểm " .. pity1 .. "/" .. pity2 .. " - lượt quay free " .. reroll .. " - đổi sau " .. timeStr 
-            end 
-            return "Unstable DNA - needs " .. needs .. " - pity " .. pity1 .. "/" .. pity2 .. " - free rerolls " .. reroll .. " - rotates in " .. timeStr 
-        end 
-    },
-    -- Regex đếm số lượng Mẫu Vật & Phụ Tùng sự kiện Dr Scramble
-    { 
-        pattern = "^Samples (%d+) %- Lost (%d+)/(%d+) Drone (.-) %- Outbreak in (.-)$", 
-        format = function(lang, s, l1, l2, d, t) 
-            if lang == "VI" then return "Mẫu vật " .. s .. " - Đã rơi " .. l1 .. "/" .. l2 .. " - Drone " .. d .. " - Bùng phát sau " .. t end 
-            return "Samples " .. s .. " - Lost " .. l1 .. "/" .. l2 .. " - Drone " .. d .. " - Outbreak in " .. t 
-        end 
-    },
-    { 
-        pattern = "^Lost Parts on map (%d+)/(%d+) %- Collected (%d+)/(%d+)$", 
-        format = function(lang, m1, m2, c1, c2) 
-            if lang == "VI" then return "Phụ Tùng Rơi trên map " .. m1 .. "/" .. m2 .. " - Đã nhặt " .. c1 .. "/" .. c2 end 
-            return "Lost Parts on map " .. m1 .. "/" .. m2 .. " - Collected " .. c1 .. "/" .. c2 
-        end 
-    },
-    { 
-        pattern = "^(%d+) selected$", 
-        format = function(lang, count) 
-            if lang == "VI" then return "Đã chọn " .. count end 
-            return count .. " selected" 
-        end 
-    },
-    { 
-        pattern = "^IN INVENTORY %((%d+)%)$", 
-        format = function(lang, count) 
-            if lang == "VI" then return "TRONG TÚI ĐỒ (" .. count .. ")" end 
-            return "IN INVENTORY (" .. count .. ")" 
-        end 
-    },
-    { 
-        pattern = "^Eggs placed (%d+)%/(%d+) %- (%d+)%/(%d+) pets equipped, (%d+) in bag$", 
-        format = function(lang, e1, e2, p1, p2, b1) 
-            if lang == "VI" then return "Đã đặt " .. e1 .. "/" .. e2 .. " trứng - " .. p1 .. "/" .. p2 .. " thú trang bị, " .. b1 .. " trong túi" end 
-            return "Eggs placed " .. e1 .. "/" .. e2 .. " - " .. p1 .. "/" .. p2 .. " pets equipped, " .. b1 .. " in bag" 
-        end 
-    },
-    { 
-        pattern = "^Pet matches %- (%d+) pets for %$(.-)$", 
-        format = function(lang, count, val) 
-            if lang == "VI" then return "Thú khớp lệnh - " .. count .. " thú, tổng giá $" .. val end 
-            return "Pet matches - " .. count .. " pets for $" .. val 
-        end 
-    },
-    { 
-        pattern = "^Egg matches %- (%d+) eggs for %$(.-)$", 
-        format = function(lang, count, val) 
-            if lang == "VI" then return "Trứng khớp lệnh - " .. count .. " trứng, tổng giá $" .. val end 
-            return "Egg matches - " .. count .. " eggs for $" .. val 
-        end 
-    },
-    { 
-        pattern = "^Next fuse %- (%d+) (.-) for %$(.-)$", 
-        format = function(lang, count, name, val) 
-            if lang == "VI" then return "Ghép tiếp theo - " .. count .. " " .. name .. " tốn $" .. val end 
-            return "Next fuse - " .. count .. " " .. name .. " for $" .. val 
-        end 
-    },
-    { 
-        pattern = "^Favorite matches %- (%d+) pets, (%d+) to mark %| (%d+) favorited$", 
-        format = function(lang, mCount, mark, fav) 
-            if lang == "VI" then return "Khớp khóa thú - " .. mCount .. " con, " .. mark .. " cần khóa | " .. fav .. " đã khóa" end 
-            return "Favorite matches - " .. mCount .. " pets, " .. mark .. " to mark | " .. fav .. " favorited" 
-        end 
-    },
-    { 
-        pattern = "^Riftborn %- needs (.-) %- pity (%d+)%/(%d+) %- free rerolls (%d+) %- rotates in (.-) %- boss portal (.-)$", 
-        format = function(lang, needs, pity1, pity2, reroll, timeStr, status) 
-            if lang == "VI" then return "Riftborn - Cần: " .. needs .. " - Bảo hiểm: " .. pity1 .. "/" .. pity2 .. " - Quay free: " .. reroll .. " - Đổi sau " .. timeStr .. " - Cổng Boss: " .. (status == "closed" and "Đóng" or "Mở") end 
-            return "Riftborn - needs " .. needs .. " - pity " .. pity1 .. "/" .. pity2 .. " - free rerolls " .. reroll .. " - rotates in " .. timeStr .. " - boss portal " .. status 
-        end 
-    },
-    { 
-        pattern = "^(%d+) eggs %- (%d+) ready %- (%d+) growing %- (%d+) in bag %- Total (.-)$", 
-        format = function(lang, e1, r1, g1, b1, t1) 
-            if lang == "VI" then return e1 .. " trứng - " .. r1 .. " xong - " .. g1 .. " đang lớn - " .. b1 .. " trong túi - Tổng " .. t1 end 
-            return e1 .. " eggs - " .. r1 .. " ready - " .. g1 .. " growing - " .. b1 .. " in bag - Total " .. t1 
-        end 
-    },
-    { 
-        pattern = "^Players (%d+)%/(%d+)$", 
-        format = function(lang, p1, p2) 
-            if lang == "VI" then return "Người chơi: " .. p1 .. "/" .. p2 end 
-            return "Players " .. p1 .. "/" .. p2 
-        end 
-    }
+-- =========================================================
+-- TỪ ĐIỂN 2: THAY THẾ CỤM TỪ (fallback, xử lý câu dài)
+-- =========================================================
+local MAP_VI = {
+    ["Chilli Hub"] = "Chilli Hub V2",
+    ["Farm"] = "Cày Cuốc",
+    ["Player"] = "Người Chơi",
+    ["Predictor"] = "Dự Đoán",
+    ["Progress"] = "Tiến Trình",
+    ["Server"] = "Máy Chủ",
+    ["Misc"] = "Khác",
+    ["Auto Hop"] = "Tự Đổi Server",
+    ["Discord"] = "Discord",
+    ["Quick & Keys"] = "Phím Tắt & Key",
+    ["Settings"] = "Cài Đặt",
+    ["Config"] = "Cấu Hình",
+    ["Filter features..."] = "Lọc tính năng...",
+    ["Search"] = "Tìm kiếm",
+
+    ["Dr Scramble Lab & Mech"] = "Phòng Lab & Robot Scramble",
+    ["Butterfly Bloom"] = "Sự Kiện Bắt Bướm",
+    ["Wisp Companion"] = "Đồng Hành Wisp",
+    ["Auto Steal"] = "Tự Động Cướp Trứng",
+    ["Auto Place Egg"] = "Tự Động Đặt Trứng",
+    ["Auto Treadmill"] = "Tự Động Máy Tập",
+    ["Auto Hatch & Equip"] = "Tự Ấp Trứng & Trang Bị",
+    ["Auto Sell"] = "Tự Động Bán",
+    ["Auto Sell Pet"] = "Tự Động Bán Pet",
+    ["Auto Sell Egg"] = "Tự Động Bán Trứng",
+    ["Auto Sell Lab Egg"] = "Tự Động Bán Trứng Lab",
+    ["Auto Fuse Machine"] = "Máy Dung Hợp Pet",
+    ["Auto Favorite"] = "Tự Động Khóa Pet",
+    ["Priority"] = "Ưu Tiên Nhiệm Vụ",
+    ["ESP"] = "Định Vị (ESP)",
+    ["Movement"] = "Di Chuyển",
+    ["Character"] = "Nhân Vật",
+    ["Combat"] = "Chiến Đấu",
+    ["Discord Webhook"] = "Cài Đặt Webhook Discord",
+    ["Egg Predictor"] = "Dự Đoán Trứng",
+    ["Lab Predictor"] = "Dự Đoán Phòng Lab",
+    ["Fuse Predictor"] = "Dự Đoán Dung Hợp",
+    ["Auto Progression"] = "Tự Động Tiến Trình",
+    ["Performance"] = "Hiệu Năng",
+    ["Utility"] = "Tiện Ích",
+    ["Egg Finder"] = "Dò Tìm Trứng",
+    ["Quick Bar 1"] = "Thanh Phím Nhanh 1",
+    ["Quick Bar 2"] = "Thanh Phím Nhanh 2",
+
+    ["Auto Butterfly Bloom"] = "Tự Động Bắt Bướm",
+    ["Catch Mode"] = "Chế Độ Bắt",
+    ["Catch Priority"] = "Ưu Tiên Bắt",
+    ["Only for Chase mode"] = "Chỉ dùng cho chế độ Đuổi theo",
+    ["Catch Butterflies"] = "Chọn Bướm Cần Bắt",
+    ["Radiant Butterfly"] = "Bướm Rực Rỡ",
+    ["Amethyst Butterfly"] = "Bướm Thạch Anh Tím",
+    ["Sapphire Butterfly"] = "Bướm Lam Ngọc (Sapphire)",
+    ["Emerald Butterfly"] = "Bướm Lục Bảo (Emerald)",
+    ["Tween Speed"] = "Tốc Độ Bay (Tween)",
+    ["Auto Trade Up"] = "Tự Nâng Cấp Bướm",
+    ["Trade Up Tiers"] = "Bậc Nâng Cấp",
+    ["Smart Trade For Essence"] = "Đổi Bướm Lấy Tinh Chất Thông Minh",
+    ["Going to the middle of the bloom"] = "Đang đi tới trung tâm khu bướm nở",
+
+    ["Auto Craft Essence"] = "Tự Chế Tạo Tinh Chất",
+    ["Auto Use Enchanted Essence"] = "Tự Dùng Tinh Chất Phù Phép",
+    ["Essence Min Rarity"] = "Độ Hiếm Nhận Tinh Chất Min",
+    ["Only eggs of this rarity and above get the essence"] = "Chỉ trứng đạt độ hiếm này trở lên mới nhận tinh chất",
+    ["Essence Min Value"] = "Giá Trị Nhận Tinh Chất Min",
+    ["Skip eggs worth less than this (0 = off)"] = "Bỏ qua trứng giá trị nhỏ hơn mức này (0 = tắt)",
+    ["Essence Target Eggs"] = "Mục Tiêu Trứng Nhận Tinh Chất",
+    ["Only use the essence on these eggs (empty = all)"] = "Chỉ dùng tinh chất lên trứng này (trống = tất cả)",
+    ["Essence Priority"] = "Ưu Tiên Dùng Tinh Chất",
+    ["Which egg gets the essence first"] = "Trứng nào được ưu tiên nhận tinh chất trước",
+    ["Essence Skip Enchanted Eggs"] = "Bỏ Qua Trứng Đã Phù Phép",
+    ["Skip eggs that already got Enchanted, other mutations still get the essence"] = "Bỏ qua trứng đã phù phép, đột biến khác vẫn nhận tinh chất",
+
+    ["Instant Steal"] = "Cướp Siêu Tốc (Instant Steal)",
+    ["Delivers the egg to the safe zone in a few seconds, needs enough Speed"] = "Chuyển trứng về căn cứ trong vài giây (cần đủ tốc độ)",
+    ["Instant Steal Steps"] = "Số Bước Cướp Siêu Tốc",
+    ["Higher is safer but takes longer"] = "Càng nhiều bước càng an toàn nhưng bay chậm hơn",
+    ["Target Areas"] = "Khu Vực Mục Tiêu",
+    ["Min Steal Value"] = "Giá Trị Cướp Min",
+    ["Target Specific Eggs"] = "Chọn Đích Danh Trứng Cần Cướp",
+    ["Steal Missing Lab Eggs"] = "Cướp Trứng Lab Còn Thiếu",
+    ["Steal Missing Index Eggs"] = "Cướp Trứng Sách Còn Thiếu",
+    ["Also steal eggs missing from your index, highest area first"] = "Cướp cả trứng còn thiếu trong sách, ưu tiên khu cao nhất",
+    ["Steal Priority"] = "Ưu Tiên Cướp",
+    ["Carry Speed"] = "Tốc Độ Bê Trứng",
+    ["Over 100% may glitch"] = "Trên 100% có thể bị lỗi vị trí",
+    ["Anti Guard Panel"] = "Bảng Chống Vệ Sĩ",
+
+    ["Place Egg Rule"] = "Quy Tắc Đặt Trứng",
+    ["Place Egg Order"] = "Thứ Tự Đặt Trứng",
+    ["Place Rarities"] = "Độ Hiếm Đặt Trứng",
+    ["Only place eggs of the picked rarities (empty = all)"] = "Chỉ đặt trứng thuộc các độ hiếm đã chọn (trống = tất cả)",
+    ["Place Specific Eggs"] = "Chọn Đích Danh Trứng Cần Đặt",
+    ["Only place these eggs (empty = all)"] = "Chỉ đặt các trứng này (trống = tất cả)",
+    ["Min Place Value"] = "Giá Trị Đặt Min",
+    ["Skip eggs worth less than this (0 = off)"] = "Bỏ qua trứng giá trị thấp hơn mức này (0 = tắt)",
+    ["Stay On Treadmill"] = "Cố Định Trên Máy Tập",
+
+    ["Auto Hatch"] = "Tự Động Ấp Trứng",
+    ["Hatch Min Rarity"] = "Độ Hiếm Ấp Min",
+    ["Hatch eggs of the chosen rarity and every rarity above it"] = "Ấp trứng từ độ hiếm đã chọn trở lên",
+    ["Min Hatch Value"] = "Giá Trị Ấp Min",
+    ["Hatch Specific Eggs"] = "Chọn Đích Danh Trứng Cần Ấp",
+    ["Auto Equip Best"] = "Tự Trang Bị Pet Tốt Nhất",
+    ["Equip Best when a better pet appears"] = "Tự trang bị khi có pet mạnh hơn xuất hiện",
+
+    ["Sell Pets Now"] = "Bán Pet Ngay",
+    ["Sell matching pets once"] = "Bán các pet khớp điều kiện một lần",
+    ["Sell Pet Rule"] = "Quy Tắc Bán Pet",
+    ["Which checks must pass to sell"] = "Các điều kiện bắt buộc để bán",
+    ["Pet Max Rarity"] = "Độ Hiếm Pet Max Cần Bán",
+    ["Sell pets at or below this rarity"] = "Bán pet từ độ hiếm này trở xuống",
+    ["Pet Sell Value"] = "Giá Trị Bán Pet Min",
+    ["Sell pets worth less than this (0 = off)"] = "Bán pet có giá trị nhỏ hơn mức này (0 = tắt)",
+    ["Keep Mutated Pets"] = "Giữ Lại Pet Đột Biến",
+    ["Never sell mutated pets"] = "Không bao giờ bán pet có đột biến",
+    ["Blacklist Sell Pets"] = "Danh Sách Đen Bán Pet",
+    ["These pets are never sold"] = "Những pet này sẽ không bao giờ bị bán",
+    ["Sell bag eggs matching the rules below"] = "Bán trứng trong túi khớp quy tắc dưới",
+    ["Sell Eggs Now"] = "Bán Trứng Ngay",
+    ["Sell matching eggs once"] = "Bán một lần các trứng khớp điều kiện",
+    ["Sell Egg Rule"] = "Quy Tắc Bán Trứng",
+    ["Egg Max Rarity"] = "Độ Hiếm Trứng Max Cần Bán",
+    ["Sell eggs at or below this rarity"] = "Bán trứng từ độ hiếm này trở xuống",
+    ["Egg Sell Value"] = "Giá Trị Bán Trứng Min",
+    ["Keep Mutated Eggs"] = "Giữ Lại Trứng Đột Biến",
+    ["Never sell mutated eggs"] = "Không bao giờ bán trứng có đột biến",
+    ["Blacklist Sell Eggs"] = "Danh Sách Đen Bán Trứng",
+    ["These eggs are never sold"] = "Những trứng này sẽ không bao giờ bị bán",
+    ["Sell eggs traded from Dr Scramble that match the filters below"] = "Bán trứng đổi từ Dr Scramble khớp bộ lọc dưới",
+    ["Sell Lab Eggs Now"] = "Bán Trứng Lab Ngay",
+    ["Sell matching Lab eggs once"] = "Bán một lần các trứng Lab khớp điều kiện",
+    ["Sell Lab Egg Rule"] = "Quy Tắc Bán Trứng Lab",
+    ["Lab Egg Max Rarity"] = "Độ Hiếm Trứng Lab Max Cần Bán",
+    ["Sell Lab eggs at or below this rarity (Off = none by rarity)"] = "Bán trứng Lab từ độ hiếm này trở xuống (Off = tắt)",
+    ["Lab Egg Sell Value"] = "Giá Trị Bán Trứng Lab Min",
+    ["Sell Lab eggs worth less than this (0 = off)"] = "Bán trứng Lab giá trị thấp hơn mức này (0 = tắt)",
+    ["Keep Mutated Lab Eggs"] = "Giữ Lại Trứng Lab Đột Biến",
+    ["Never sell mutated Lab eggs"] = "Không bao giờ bán trứng Lab có đột biến",
+    ["Keep Lab Pets"] = "Giữ Lại Pet Lab",
+    ["Lab eggs of these pets are never sold"] = "Trứng Lab của những pet này sẽ không bao giờ bị bán",
+
+    ["No three matching pets"] = "Không đủ 3 pet trùng khớp",
+    ["Fuse 3 same pets into an egg, nonstop"] = "Ghép 3 pet cùng loại thành 1 trứng liên tục",
+    ["Fuse Priority Mode"] = "Chế Độ Ưu Tiên Dung Hợp",
+    ["Pets To Use"] = "Loại Pet Sử Dụng",
+    ["Max Rarity to Fuse"] = "Độ Hiếm Dung Hợp Max",
+    ["Specific Species to Fuse"] = "Chỉ Định Loài Cần Dung Hợp",
+    ["Only fuse these species (empty = all)"] = "Chỉ ghép loài này (trống = tất cả)",
+    ["Skip Mutated Pets"] = "Bỏ Qua Pet Đột Biến",
+    ["Eject Incomplete Slots"] = "Nhả Các Ô Chưa Đủ Bộ",
+    ["Take out pets that can't make a set"] = "Đẩy ra các pet không thể ghép đủ bộ 3",
+
+    ["Auto Favorite Pet"] = "Tự Động Khóa Pet",
+    ["Favorite pets matching the rules below"] = "Khóa các pet khớp quy tắc bên dưới",
+    ["Favorite Pets Now"] = "Khóa Pet Ngay",
+    ["Favorite matching pets once"] = "Khóa các pet khớp điều kiện một lần",
+    ["Favorite Rule"] = "Quy Tắc Khóa",
+    ["Pass any check or all checks"] = "Thỏa mãn một hoặc tất cả điều kiện",
+    ["Favorite Min Rarity"] = "Độ Hiếm Khóa Min",
+    ["Favorite pets of the chosen rarity and every rarity above it (Off = skip)"] = "Khóa pet từ độ hiếm đã chọn trở lên (Off = bỏ qua)",
+    ["Favorite Mutations"] = "Đột Biến Cần Khóa",
+    ["Mutation check (empty = skip)"] = "Kiểm tra đột biến (trống = bỏ qua)",
+    ["Min Favorite Value"] = "Giá Trị Khóa Min",
+    ["Value check (0 = skip)"] = "Kiểm tra giá trị (0 = bỏ qua)",
+    ["Always Favorite Species"] = "Luôn Khóa Các Loài Này",
+    ["Always favorite these species"] = "Luôn luôn khóa những loài này",
+    ["Auto Favorite Equipped"] = "Tự Khóa Pet Đang Dùng",
+    ["Keep equipped pets favorited"] = "Luôn giữ pet đang trang bị được khóa",
+    ["Auto Unfavorite Equipped"] = "Tự Bỏ Khóa Pet Đang Dùng",
+    ["Unfavorite equipped pets not in the rules"] = "Mở khóa pet đang trang bị nếu không đúng quy tắc",
+    ["Favorite Equipped Now"] = "Khóa Pet Đang Dùng Ngay",
+    ["Favorite all equipped pets once"] = "Khóa tất cả pet đang trang bị một lần",
+    ["Unfavorite Equipped Now"] = "Bỏ Khóa Pet Đang Dùng Ngay",
+    ["Unfavorite all equipped pets once"] = "Mở khóa tất cả pet đang trang bị một lần",
+
+    ["Auto Mech Boss"] = "Tự Động Đánh Boss Robot",
+    ["Mech Tween Speed"] = "Tốc Độ Bay Đánh Boss",
+    ["Main Weapon Hold"] = "Thời Gian Giữ Vũ Khí Chính",
+    ["Scrambler Hold"] = "Thời Gian Giữ Súng Biến Đổi",
+    ["Swap Two Weapons"] = "Tự Đổi Qua Lại 2 Vũ Khí",
+    ["Boss Server Hop"] = "Tự Đổi Server Săn Boss",
+    ["After each boss, hops to a less crowded server to fight again"] = "Sau mỗi boss, đổi sang server vắng hơn để đánh tiếp",
+    ["Keep Hopping For"] = "Thời Gian Đổi Server Liên Tục",
+    ["Keeps fighting every boss it finds and hopping for this long"] = "Liên tục săn boss tìm được và đổi server trong thời gian này",
+    ["Auto Claim Mastery"] = "Tự Nhận Thưởng Tinh Thông Boss",
+    ["Claims Boss Mastery rewards as soon as they unlock"] = "Tự nhận thưởng Tinh Thông Boss ngay khi mở khóa",
+    ["Lab Banners"] = "Biểu Ngữ Phòng Lab",
+    ["Only trade and steal for these banners (empty = all)"] = "Chỉ đổi và cướp các biểu ngữ này (trống = tất cả)",
+    ["Auto Lab Trade-In"] = "Tự Đổi Đồ Phòng Thí Nghiệm",
+    ["Auto Reroll Lab Recipe"] = "Tự Đổi Công Thức Phòng Lab",
+    ["Auto Place Lab Reward Eggs"] = "Tự Đặt Trứng Thưởng Lab",
+    ["Places the reward eggs from Lab trades"] = "Tự động đặt trứng thưởng nhận từ đổi đồ phòng lab",
+    ["Auto Buy Scramble Shop"] = "Tự Mua Shop Dr. Scramble",
+    ["Buy the picked items with Samples"] = "Dùng Mẫu Vật (Samples) mua các vật phẩm đã chọn",
+    ["Scramble Shop Items"] = "Vật Phẩm Cửa Hàng Scramble",
+    ["Keep Samples"] = "Giữ Lại Mẫu Vật Tối Thiểu",
+    ["Never spend below this many Samples"] = "Không bao giờ tiêu hao dưới mức mẫu vật này",
+    ["Auto Use Scrambled"] = "Tự Dùng Thuốc Biến Đổi Scrambled",
+    ["Turn it on to start applying Scrambled"] = "Bật lên để bắt đầu áp dụng thuốc Scrambled",
+    ["Auto Buy Scrambled"] = "Tự Mua Thêm Scrambled Khi Hết",
+    ["Buy another Scrambled from the event shop when you run out"] = "Tự mua thêm Scrambled từ shop sự kiện khi dùng hết",
+    ["Mutation Min Rarity"] = "Độ Hiếm Đột Biến Min",
+    ["Only eggs of this rarity and above are used"] = "Chỉ dùng trứng từ độ hiếm này trở lên",
+    ["Min Mutation Value"] = "Giá Trị Đột Biến Min",
+    ["Mutation Priority"] = "Ưu Tiên Đột Biến",
+    ["Which egg gets the consumable first"] = "Trứng nào được ưu tiên dùng thuốc trước",
+    ["Mutation Target Eggs"] = "Mục Tiêu Trứng Đột Biến",
+    ["Only use the consumable on these eggs (empty = all)"] = "Chỉ dùng thuốc lên các trứng này (trống = tất cả)",
+    ["Auto Wisp"] = "Tự Động Nhặt Wisp",
+    ["Auto Banjo Cricket"] = "Tự Động Bắt Dế Banjo",
+
+    ["Chase Settings"] = "Cài Đặt Đuổi Đánh",
+    ["Chase Cài Đặt"] = "Cài Đặt Đuổi Đánh",
+    ["Hit Tween Speed"] = "Tốc Độ Bay Đánh",
+    ["Hit Max Speed"] = "Tốc Độ Đánh Tối Đa",
+    ["Hit Lead"] = "Đón Đầu Đòn Đánh (Hit Lead)",
+    ["Stand further ahead of the target (i.e. or closer to them)"] = "Đứng đón đầu mục tiêu xa hơn (hoặc áp sát gần hơn)",
+    ["Hit Sweep"] = "Góc Quét Đòn Đánh (Hit Sweep)",
+    ["How far you swipe back and forth in front of the target"] = "Khoảng cách vung vũ khí quét qua lại trước mục tiêu",
+    ["Add/Remove Hits On Quick Bar 2"] = "Thêm/Bỏ Nút Đánh Vào Quick Bar 2",
+    ["Pin or unpin the hit toggles on Quick Bar 2"] = "Ghim hoặc bỏ ghim các nút đánh trên Quick Bar 2",
+    ["Auto Hit Nearest Player"] = "Tự Đánh Người Gần Nhất",
+    ["Auto Hit Egg Holders"] = "Tự Đánh Người Đang Bê Trứng",
+    ["Auto Hit Specific Player"] = "Tự Đánh Người Chỉ Định",
+    ["Hit Player"] = "Chọn Người Cần Đánh",
+    ["Hit Aura"] = "Vòng Đánh Tự Động (Hit Aura)",
+    ["Instant Prompts"] = "Tương Tác Phím Nhanh (Instant E)",
+    ["Speed Boost"] = "Tăng Tốc Chạy",
+    ["Boost Speed"] = "Tốc Độ Tăng Tốc",
+    ["Infinite Jump"] = "Nhảy Vô Hạn",
+    ["Invisibility"] = "Tàng Hình (Invisibility)",
+    ["Makes you invisible to other players"] = "Làm bạn vô hình trước người chơi khác",
+    ["Anti Ragdoll"] = "Chống Ngã (Anti Ragdoll)",
+    ["Anti Trap"] = "Chống Bẫy (Anti Trap)",
+    ["Traps from other players cannot catch you"] = "Bẫy của người khác không thể bắt được bạn",
+
+    ["ESP Eggs"] = "ESP Trứng",
+    ["ESP Fixed Size"] = "Cỡ ESP Cố Định",
+    ["ESP Own Base Eggs"] = "Hiện Trứng Căn Cứ Mình",
+    ["Also show the eggs placed in your own base"] = "Hiển thị cả trứng đã đặt tại căn cứ của bạn",
+    ["ESP Min Rarity"] = "Độ Hiếm ESP Min",
+    ["Show eggs of the chosen rarity and every rarity above it"] = "Hiện trứng từ độ hiếm đã chọn trở lên",
+    ["ESP Show Info"] = "Hiện Thông Tin ESP",
+    ["Min ESP Value"] = "Giá Trị ESP Min",
+    ["ESP Egg Size"] = "Cỡ ESP Trứng",
+    ["ESP Guards"] = "ESP Vệ Sĩ",
+    ["ESP Guard Size"] = "Cỡ ESP Vệ Sĩ",
+    ["ESP Lost Parts"] = "ESP Phụ Tùng Rơi",
+    ["ESP Players"] = "ESP Người Chơi",
+    ["ESP Player Info"] = "Thông Tin ESP Người Chơi",
+    ["ESP Player Size"] = "Cỡ ESP Người Chơi",
+
+    ["Search eggs..."] = "Tìm kiếm trứng...",
+    ["FLY TO EGG"] = "BAY ĐẾN TRỨNG",
+    ["Biohazard Pets"] = "Pet Phóng Xạ (Biohazard)",
+    ["CURRENT RECIPE"] = "CÔNG THỨC HIỆN TẠI",
+    ["REWARD ODDS - BIOHAZARD PETS"] = "TỈ LỆ THƯỞNG - PET PHÓNG XẠ",
+    ["Chase pet"] = "Đuổi bắt pet",
+    ["Machine is empty"] = "Máy đang trống",
+    ["Load 3 pets of the same species to see the result odds"] = "Đặt 3 pet cùng loài vào máy để xem tỉ lệ kết quả",
+    ["Sort By"] = "Sắp Xếp Theo",
+    ["Preview Card"] = "Thẻ Xem Trước",
+
+    ["Auto Buy Trail"] = "Tự Mua Vệt Sáng (Trail)",
+    ["Automatically buy available trails when affordable"] = "Tự động mua vệt sáng có sẵn khi đủ tiền",
+    ["Auto Upgrade Base"] = "Tự Nâng Cấp Căn Cứ",
+    ["Automatically upgrade base when money is available"] = "Tự động nâng cấp căn cứ khi đủ tiền",
+    ["Auto Upgrade Treadmill"] = "Tự Nâng Cấp Máy Tập",
+    ["Automatically upgrade treadmill when money is available"] = "Tự động nâng cấp máy tập khi đủ tiền",
+    ["Auto Claim"] = "Tự Nhận Thưởng",
+    ["Claim offline money & index rewards"] = "Nhận tiền tích lũy offline & thưởng sách pet",
+    ["Auto Claim Index"] = "Tự Nhận Thưởng Sách Pet",
+    ["Claim index rewards as soon as they unlock"] = "Tự động nhận thưởng sách ngay khi mở khóa",
+
+    ["Auto Load Script"] = "Tự Động Nạp Script",
+    ["Server Hop Mode"] = "Chế Độ Đổi Server",
+    ["Server Hop"] = "Đổi Server",
+    ["Job ID"] = "Mã Phòng (Job ID)",
+    ["Paste a server Job ID..."] = "Dán mã Job ID của server...",
+    ["Join Job ID"] = "Vào Bằng Job ID",
+    ["Copy Current Job ID"] = "Chép Job ID Hiện Tại",
+    ["Rejoin Server"] = "Vào Lại Server",
+    ["Auto Rejoin When Disconnect"] = "Tự Kết Nối Lại Khi Mất Mạng",
+
+    ["FPS Cap"] = "Giới Hạn FPS",
+    ["Optimizer"] = "Tối Ưu Hóa (Giảm Lag)",
+    ["Strip shadows, textures and effects for the highest FPS"] = "Xóa bóng, bề mặt và hiệu ứng để đạt FPS tối đa",
+    ["FPS and Ping"] = "Hiện FPS & Ping",
+    ["FPS and Ping Size"] = "Kích Cỡ FPS & Ping",
+    ["Disable 3D Render"] = "Tắt Đồ Họa 3D",
+    ["Farm HUD"] = "Bảng Cày Cuốc (Farm HUD)",
+    ["Drag any panel to place it where you like"] = "Kéo bất kỳ bảng nào đến vị trí bạn muốn",
+    ["Anti AFK"] = "Chống Treo Máy (Anti AFK)",
+
+    ["Joins new servers to find eggs that match the filters below"] = "Tự đổi server để tìm trứng khớp bộ lọc bên dưới",
+    ["Turn on Auto Hop to start hunting"] = "Bật Tự Đổi Server để bắt đầu săn trứng",
+    ["Hop Mode"] = "Chế Độ Đổi Server",
+    ["Rarity To Wait For"] = "Độ Hiếm Cần Giữ Chân",
+    ["For After A Rare Spawns this rarity or higher"] = "Chờ nếu xuất hiện trứng từ độ hiếm này trở lên",
+    ["Sync With Auto Steal Filters"] = "Đồng Bộ Bộ Lọc Cướp",
+    ["Changing a filter here also changes it in Auto Steal, and back"] = "Thay đổi bộ lọc tại đây sẽ đồng bộ với mục Tự Động Cướp",
+    ["Find eggs of the chosen rarity and every rarity above it"] = "Tìm trứng thuộc độ hiếm đã chọn và cao hơn",
+    ["Min Value To Find"] = "Giá Trị Trứng Min Cần Tìm",
+    ["Skip eggs worth less than this. Drag or type 350k, 50m, 10b"] = "Bỏ qua trứng giá nhỏ hơn mức này. Kéo hoặc nhập 350k, 50m, 10b",
+    ["First Hop Delay"] = "Độ Trễ Lần Đổi Server Đầu",
+    ["Wait after the script loads before the first hop"] = "Chờ sau khi nạp script hoàn tất trước khi đổi server",
+    ["Webhook URL"] = "Đường Dẫn Webhook",
+    ["Ping @everyone"] = "Tag @everyone",
+    ["Notify Stolen Eggs"] = "Báo Cáo Cướp Trứng",
+    ["Post every egg you bring home"] = "Gửi thông báo mỗi quả trứng mang về thành công",
+    ["selected"] = "đã chọn"
 }
 
-local SortedVI = {}
-for en, vi in pairs(MAP_VI) do
-    table.insert(SortedVI, {en = en, out = vi, len = #en})
-end
-table.sort(SortedVI, function(a, b) return a.len > b.len end)
+-- =========================================================
+-- HÀM DỊCH (EXACT MATCH TRƯỚC, FALLBACK MAP_VI)
+-- =========================================================
+local sortedKeys = {}
+for k in pairs(MAP_VI) do table.insert(sortedKeys, k) end
+table.sort(sortedKeys, function(a,b) return #a > #b end)
 
-local function translateText(raw)
-    local cacheKey = currentLanguage .. "|" .. raw
-    if FastCache[cacheKey] then return FastCache[cacheKey] end
-
-    local trimmed = raw:gsub("^%s*(.-)%s*$", "%1")
-    local exactMatch = nil
-
-    if currentLanguage == "VI" then
-        exactMatch = MAP_VI[trimmed]
-    end
-
-    if exactMatch then
-        local res = safeReplace(raw, trimmed, exactMatch)
-        FastCache[cacheKey] = res
-        return res
-    end
-
-    for _, item in ipairs(DYNAMIC_PATTERNS) do
-        local matches = {trimmed:match(item.pattern)}
-        if #matches > 0 then
-            local res = item.format(currentLanguage, unpack(matches))
-            FastCache[cacheKey] = res
-            return res
-        end
-    end
-
-    local result = raw
-    local matched = false
-
-    if currentLanguage == "VI" then
-        for _, item in ipairs(SortedVI) do
-            if result:find(item.en, 1, true) then
-                result = safeReplace(result, item.en, item.out)
-                matched = true
-            end
-        end
-    end
-
-    FastCache[cacheKey] = matched and result or raw
-    return FastCache[cacheKey]
+local escapePattern = function(s)
+    return (s:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
 end
 
-local TrackedElements = {}
+local translateCache = {}
 
-local function applyTranslation(inst)
-    if not (inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox")) then return end
-    if inst:FindFirstAncestor("Chilli_LangToggle_Slate") then return end
+local SKIP_PATTERNS = {
+    "^[%d%p%s]+$",
+    "^%$[%d%.]+[KMBT]?$",
+    "^%d+[KMBT]?$",
+    "^[+%-]%$[%d%.]+[KMBT]?$",
+    "^%d+%.%d+s$",
+    "^%d+/%d+$",
+}
 
-    local original = inst:GetAttribute("OriginalRawText")
-    if not original then
-        original = inst.Text
-        inst:SetAttribute("OriginalRawText", original)
+local function shouldSkip(text)
+    for _, pat in ipairs(SKIP_PATTERNS) do
+        if text:match(pat) then return true end
     end
-
-    if currentLanguage == "EN" then
-        if inst.Text ~= original then
-            translationLock = true
-            inst.Text = original
-            translationLock = false
-        end
-    else
-        local mappedText = translateText(original)
-        if inst.Text ~= mappedText then
-            translationLock = true
-            inst.Text = mappedText
-            translationLock = false
-        end
-    end
+    return false
 end
 
-local function hookElement(inst)
-    if not (inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox")) then return end
-    if inst:GetAttribute("HasTranslateHook") then return end
-    inst:SetAttribute("HasTranslateHook", true)
-
-    table.insert(TrackedElements, inst)
-    task.defer(function() applyTranslation(inst) end)
-
-    inst:GetPropertyChangedSignal("Text"):Connect(function()
-        if not translationLock then
-            local current = inst.Text
-            local isKnown = false
-            if currentLanguage ~= "EN" then
-                for _, item in ipairs(SortedVI) do
-                    if current:find(item.out, 1, true) then
-                        isKnown = true
-                        break
-                    end
-                end
-            else
-                isKnown = (current == inst:GetAttribute("OriginalRawText"))
-            end
-
-            if not isKnown then
-                inst:SetAttribute("OriginalRawText", current)
-            end
-            applyTranslation(inst)
-        end
-    end)
-end
-
-local function updateAllActive()
-    for i = #TrackedElements, 1, -1 do
-        local el = TrackedElements[i]
-        if el and el.Parent then
-            applyTranslation(el)
-        else
-            table.remove(TrackedElements, i)
-        end
-    end
-end
-
--- ==================== 3. NÚT ĐỔI NGÔN NGỮ (TOP-CENTER) ====================
-local function createLangToggleUI()
-    local parentTarget = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-    local old = parentTarget:FindFirstChild("Chilli_LangToggle_Slate")
-    if old then old:Destroy() end
-
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "Chilli_LangToggle_Slate"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.DisplayOrder = 2147483647
-    ScreenGui.Parent = parentTarget
-
-    local Container = Instance.new("Frame", ScreenGui)
-    Container.Size = UDim2.new(0, 136, 0, 28)
-    Container.AnchorPoint = Vector2.new(0.5, 0)
-    Container.Position = UDim2.new(0.5, 0, 0, 15)
-    Container.BackgroundColor3 = Color3.fromRGB(16, 20, 28)
-    Container.BackgroundTransparency = 0.2
-    Container.BorderSizePixel = 0
-    Instance.new("UICorner", Container).CornerRadius = UDim.new(1, 0)
-
-    local Stroke = Instance.new("UIStroke", Container)
-    Stroke.Color = Color3.fromRGB(160, 45, 45)
-    Stroke.Thickness = 1.0
-
-    local Icon = Instance.new("TextLabel", Container)
-    Icon.Size = UDim2.new(0, 22, 1, 0)
-    Icon.Position = UDim2.new(0, 8, 0, 0)
-    Icon.BackgroundTransparency = 1
-    Icon.Text = "🌐"
-    Icon.TextSize = 14
-
-    local Label = Instance.new("TextLabel", Container)
-    Label.Size = UDim2.new(1, -36, 1, 0)
-    Label.Position = UDim2.new(0, 30, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = "Tiếng Việt"
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextSize = 11
-    Label.TextColor3 = Color3.fromRGB(240, 130, 130)
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local ClickBtn = Instance.new("TextButton", Container)
-    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
-    ClickBtn.BackgroundTransparency = 1
-    ClickBtn.Text = ""
-
-    local dragging, dragStart, startPos = false, nil, nil
-    Container.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = Container.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    Container.InputChanged:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
-            local delta = input.Position - dragStart
-            Container.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    ClickBtn.MouseButton1Click:Connect(function()
-        if currentLanguage == "VI" then
-            currentLanguage = "EN"
-            Label.Text = "English"
-            TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(215, 180, 180)}):Play()
-            TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(75, 45, 45)}):Play()
-        else
-            currentLanguage = "VI"
-            Label.Text = "Tiếng Việt"
-            TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(240, 130, 130)}):Play()
-            TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(160, 45, 45)}):Play()
-        end
-        updateAllActive()
-    end)
-end
-
--- ==================== 4. BỘ QUÉT ZERO-LAG ĐƯỢC DEFER SAU CÙNG ====================
-task.delay(4.5, function()
-    createLangToggleUI()
+local function translateText(text)
+    if type(text) ~= "string" or text == "" then return text end
     
-    local searchRoots = { gethui and gethui(), CoreGui, LocalPlayer:FindFirstChild("PlayerGui") }
-
-    local function scanUIChunked(parent)
-        local children = parent:GetChildren()
-        for i, desc in ipairs(children) do
-            if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-                hookElement(desc)
-            end
-            if i % 20 == 0 then
-                RunService.RenderStepped:Wait()
-            end
-            scanUIChunked(desc)
+    -- Cache hit
+    local cached = translateCache[text]
+    if cached ~= nil then return cached end
+    
+    -- ✅ ƯU TIÊN 1: EXACT MATCH (khớp chính xác toàn bộ text)
+    local exact = EXACT_MATCH_VI[text]
+    if exact then
+        translateCache[text] = exact
+        return exact
+    end
+    
+    -- ✅ ƯU TIÊN 2: MAP_VI EXACT (khớp chính xác)
+    local mapped = MAP_VI[text]
+    if mapped then
+        translateCache[text] = mapped
+        return mapped
+    end
+    
+    -- Skip text động (số, tiền, thời gian)
+    if shouldSkip(text) then
+        translateCache[text] = text
+        return text
+    end
+    
+    -- ✅ ƯU TIÊN 3: FALLBACK - thay thế cụm từ trong câu dài
+    local out = text
+    for _, en in ipairs(sortedKeys) do
+        local vi = MAP_VI[en]
+        if vi ~= en then
+            local pat = "%f[%w]" .. escapePattern(en) .. "%f[%W]"
+            out = out:gsub(pat, vi)
         end
     end
+    
+    translateCache[text] = out
+    return out
+end
 
-    for _, root in ipairs(searchRoots) do
-        if root then
-            pcall(function() scanUIChunked(root) end)
-        end
+-- =========================================================
+-- POLLING ENGINE (KHÔNG HOOK EVENT - CHỐNG LAG)
+-- =========================================================
+local translating = false
+local trackedObjects = {}
+
+local IGNORE_GUI_NAMES = {
+    ["Chat"] = true, ["Backpack"] = true, ["PlayerList"] = true,
+    ["BubbleChat"] = true, ["TouchGui"] = true, ["TouchControlFrame"] = true,
+    ["ControlFrame"] = true, ["Topbar"] = true, ["StarterGui"] = true,
+    ["LangSelector"] = true,
+}
+
+local function registerObject(obj)
+    if not (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then return end
+    if obj:GetAttribute("ChilliTracked") then return end
+    obj:SetAttribute("ChilliTracked", true)
+    
+    table.insert(trackedObjects, {
+        obj = obj,
+        lastText = nil,
+    })
+end
+
+local function scanGui(gui)
+    if not gui:IsA("ScreenGui") then return end
+    if IGNORE_GUI_NAMES[gui.Name] then return end
+    
+    local descendants = gui:GetDescendants()
+    for i, d in ipairs(descendants) do
+        registerObject(d)
+        if i % 30 == 0 then task.wait() end
     end
+end
 
-    for _, root in ipairs(searchRoots) do
-        if root then
-            root.DescendantAdded:Connect(function(desc)
-                task.defer(function()
-                    if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-                        hookElement(desc)
-                    end
-                end)
+local POLL_INTERVAL = 0.5
+
+local function pollingLoop()
+    while true do
+        task.wait(POLL_INTERVAL)
+        
+        if translating then continue end
+        translating = true
+        
+        for i = #trackedObjects, 1, -1 do
+            local entry = trackedObjects[i]
+            local obj = entry.obj
+            
+            if not obj or not obj.Parent then
+                table.remove(trackedObjects, i)
+                continue
+            end
+            
+            local ok, cur = pcall(function() return obj.Text end)
+            if ok and type(cur) == "string" and cur ~= "" and cur ~= entry.lastText then
+                local new = translateText(cur)
+                if new ~= cur then
+                    pcall(function() obj.Text = new end)
+                    entry.lastText = new
+                else
+                    entry.lastText = cur
+                end
+            end
+        end
+        
+        translating = false
+    end
+end
+
+-- =========================================================
+-- WATCHER
+-- =========================================================
+local function startWatching()
+    task.wait(3)
+    
+    local targets = {
+        CoreGui,
+        Players.LocalPlayer:WaitForChild("PlayerGui")
+    }
+    
+    for _, container in ipairs(targets) do
+        if container then
+            for _, gui in ipairs(container:GetChildren()) do
+                if gui:IsA("ScreenGui") and not IGNORE_GUI_NAMES[gui.Name] then
+                    task.spawn(function() scanGui(gui) end)
+                end
+            end
+            
+            container.DescendantAdded:Connect(function(d)
+                if d:IsA("ScreenGui") and not IGNORE_GUI_NAMES[d.Name] then
+                    task.defer(function() scanGui(d) end)
+                elseif d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                    task.defer(function() registerObject(d) end)
+                end
             end)
         end
+    end
+end
+
+-- =========================================================
+-- HÀM TẢI SCRIPT
+-- =========================================================
+local function fetchScript(url)
+    local ok, res = pcall(function() return game:HttpGet(url) end)
+    if ok and type(res) == "string" and #res > 0 then return res end
+    
+    for _, name in ipairs({"request","http_request","syn_request"}) do
+        local fn = _G[name]
+        if type(fn) == "function" then
+            local ok2, r = pcall(fn, {Url = url, Method = "GET"})
+            if ok2 and r and r.Body and #r.Body > 0 then
+                return r.Body
+            end
+        end
+    end
+    return nil
+end
+
+-- =========================================================
+-- UI CHỌN NGÔN NGỮ
+-- =========================================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "LangSelector"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+do
+    local ok = pcall(function() gui.Parent = CoreGui end)
+    if not ok or not gui.Parent then
+        gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+end
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 380, 0, 220)
+frame.Position = UDim2.new(0.5, -190, 0.5, -110)
+frame.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(85, 85, 110)
+
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
     end
 end)
+frame.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local d = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    end
+end)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 55)
+title.BackgroundTransparency = 1
+title.Text = "Chọn ngôn ngữ / Select Language"
+title.TextColor3 = Color3.fromRGB(240, 240, 240)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local holder = Instance.new("Frame", frame)
+holder.Size = UDim2.new(1, -40, 0, 60)
+holder.Position = UDim2.new(0, 20, 0, 65)
+holder.BackgroundTransparency = 1
+local lay = Instance.new("UIListLayout", holder)
+lay.FillDirection = Enum.FillDirection.Horizontal
+lay.Padding = UDim.new(0, 10)
+lay.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function makeBtn(text, color)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.5, -5, 1, 0)
+    b.BackgroundColor3 = color
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(240, 240, 240)
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 15
+    b.Parent = holder
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local btnVI = makeBtn("🇻🇳 Tiếng Việt", Color3.fromRGB(200, 40, 40))
+local btnEN = makeBtn("🇺🇸 English", Color3.fromRGB(40, 90, 200))
+
+local status = Instance.new("TextLabel", frame)
+status.Size = UDim2.new(1, -40, 0, 26)
+status.Position = UDim2.new(0, 20, 1, -40)
+status.BackgroundTransparency = 1
+status.Text = ""
+status.TextColor3 = Color3.fromRGB(180, 180, 180)
+status.Font = Enum.Font.Gotham
+status.TextSize = 12
+
+-- =========================================================
+-- CHẠY
+-- =========================================================
+local loading = false
+local function run(lang)
+    if loading then return end
+    loading = true
+    
+    status.Text = (lang == "vi") and "Đang tải script..." or "Loading script..."
+    btnVI:Destroy()
+    btnEN:Destroy()
+    
+    task.spawn(function()
+        local src = fetchScript(SCRIPT_URL)
+        if not src then
+            status.Text = (lang == "vi") and "❌ Không tải được script!" or "❌ Failed!"
+            loading = false
+            return
+        end
+        
+        status.Text = (lang == "vi") and "▶️ Đang chạy..." or "▶️ Running..."
+        task.wait(0.3)
+        gui:Destroy()
+        
+        local loader = loadstring or load
+        local fn, err = loader(src)
+        if not fn then
+            warn("[LangSel] loadstring error: " .. tostring(err))
+            return
+        end
+        
+        task.spawn(fn)
+        
+        if lang == "vi" then
+            task.spawn(startWatching)
+            task.spawn(pollingLoop)
+        end
+    end)
+end
+
+btnVI.MouseButton1Click:Connect(function() run("vi") end)
+btnEN.MouseButton1Click:Connect(function() run("en") end)
